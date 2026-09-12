@@ -9,19 +9,62 @@
  * vendor app's 1.0 is ~130 KB for no visible gain.
  */
 
+/**
+ * The encoded form of one entry. A still has one frame; a GIF has one per GIF frame, all
+ * framed and encoded identically. `previewUrl` is the first frame, for thumbnails.
+ */
 export interface PreparedImage {
-  jpeg: Uint8Array;
+  frames: Uint8Array[];
+  /** Sum of all frame byte lengths — what free-space accounting cares about. */
+  bytes: number;
   width: number;
   height: number;
   quality: number;
-  /** Object URL of the JPEG for previewing exactly what will be sent. */
   previewUrl: string;
+}
+
+/** Decoded source: one bitmap per frame plus each frame's display time (ms). */
+export interface SourceFrames {
+  frames: ImageBitmap[];
+  durationsMs: number[];
 }
 
 export const DEFAULT_QUALITY = 0.7;
 
 export async function loadBitmap(file: Blob): Promise<ImageBitmap> {
   return createImageBitmap(file);
+}
+
+/**
+ * Decode a file into frames. Animated images (GIF, animated WebP/PNG) come apart into
+ * every frame with its duration via WebCodecs' ImageDecoder, which Chrome has had since
+ * 94 — acceptable, since Web Bluetooth already makes this a Chrome/Edge-only app.
+ * Anything else, or a browser without ImageDecoder, is a single frame.
+ *
+ * A GIF therefore is just a "funny shaped image": one entry, one crop, one quality, N
+ * frames. The upload panels decide how the frames travel (see upload-progress.ts).
+ */
+export async function decodeFrames(file: Blob): Promise<SourceFrames> {
+  const Decoder = (globalThis as { ImageDecoder?: typeof ImageDecoder }).ImageDecoder;
+  if (Decoder && (await Decoder.isTypeSupported(file.type))) {
+    const decoder = new Decoder({ data: await file.arrayBuffer(), type: file.type });
+    await decoder.tracks.ready;
+    const count = decoder.tracks.selectedTrack?.frameCount ?? 1;
+    if (count > 1) {
+      const frames: ImageBitmap[] = [];
+      const durationsMs: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const { image } = await decoder.decode({ frameIndex: i });
+        frames.push(await createImageBitmap(image));
+        durationsMs.push(Math.max(20, Math.round((image.duration ?? 100_000) / 1000))); // µs → ms
+        image.close();
+      }
+      decoder.close();
+      return { frames, durationsMs };
+    }
+    decoder.close();
+  }
+  return { frames: [await createImageBitmap(file)], durationsMs: [0] };
 }
 
 /**
@@ -84,16 +127,17 @@ export async function encodeJpeg(canvas: HTMLCanvasElement, quality: number): Pr
 }
 
 export async function prepareImage(
-  bitmap: ImageBitmap,
+  source: ImageBitmap | ImageBitmap[],
   width: number,
   height: number,
   quality: number,
   view: View = IDENTITY_VIEW,
 ): Promise<PreparedImage> {
-  const canvas = render(bitmap, width, height, view);
-  const jpeg = await encodeJpeg(canvas, quality);
-  const previewUrl = URL.createObjectURL(new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" }));
-  return { jpeg, width, height, quality, previewUrl };
+  const bitmaps = Array.isArray(source) ? source : [source];
+  const frames: Uint8Array[] = [];
+  for (const b of bitmaps) frames.push(await encodeJpeg(render(b, width, height, view), quality));
+  const previewUrl = URL.createObjectURL(new Blob([new Uint8Array(frames[0]!)], { type: "image/jpeg" }));
+  return { frames, bytes: frames.reduce((n, f) => n + f.length, 0), width, height, quality, previewUrl };
 }
 
 export function formatBytes(n: number): string {

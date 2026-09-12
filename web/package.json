@@ -16,5 +16,8 @@
     "@types/web-bluetooth": "^0.0.21",
     "serve": "^14.2.4",
     "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@knadh/oat": "^0.8.0"
   }
 }

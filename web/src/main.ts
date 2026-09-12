@@ -49,7 +49,7 @@ badge.on("info", (e) => {
   connect.setImageKb(totalKb());
 });
 
-const totalKb = () => store.ready.reduce((n, e) => n + neededKb(e.prepared!.jpeg.length), 0);
+const totalKb = () => store.ready.reduce((n, e) => n + neededKb(e.prepared!.bytes), 0);
 store.on("update", () => connect.setImageKb(totalKb()));
 store.on("change", () => connect.setImageKb(totalKb()));
 connect.addEventListener("connection", () => upload.refresh());

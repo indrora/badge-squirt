@@ -4,6 +4,10 @@
  * Owns nothing but the UI: it is handed a Badge and reflects its events. The connect
  * click is the user gesture Chrome requires before `requestDevice` may run, so the
  * Badge.connect() call has to originate here, not from a timer or a drop handler.
+ *
+ * The Free row doubles as the "will it fit" status for the whole picture list, so that
+ * churn in free space never touches the editor (it used to cause re-encodes).
+ * Markup follows Oat: `.hstack`, `.badge`, a definition list styled locally.
  */
 
 import type { Badge } from "../ble/badge.js";
@@ -18,9 +22,11 @@ export class BadgeConnect extends HTMLElement {
 
   connectedCallback(): void {
     this.innerHTML = `
-      <button type="button" class="primary">Connect badge</button>
-      <span class="status" aria-live="polite">not connected</span>
-      <dl class="info" hidden>
+      <div class="hstack">
+        <button type="button">Connect badge</button>
+        <span class="status text-light" aria-live="polite">not connected</span>
+      </div>
+      <dl class="info mt-4" hidden>
         <dt>Name</dt><dd data-f="name"></dd>
         <dt>Size</dt><dd data-f="size"></dd>
         <dt>Free</dt><dd data-f="free"></dd>
@@ -39,7 +45,7 @@ export class BadgeConnect extends HTMLElement {
     badge.on("disconnected", () => this.setState(false));
   }
 
-  /** Size of the current encoded image in badge-KB; drives the "fits" status in the Free row. */
+  /** Total badge-KB of everything in the list; drives the fits/doesn't-fit badge. */
   setImageKb(kb: number): void {
     this.imageKb = kb;
     this.updateFree();
@@ -49,10 +55,15 @@ export class BadgeConnect extends HTMLElement {
     const info = this.badge?.info;
     const cell = this.querySelector<HTMLElement>('[data-f="free"]');
     if (!info || !cell) return;
-    const fits = this.imageKb <= info.freespace;
-    const status = this.imageKb ? (fits ? ` — image needs ${this.imageKb} KB, fits` : ` — image needs ${this.imageKb} KB, DOES NOT FIT`) : "";
-    cell.textContent = `${info.freespace} KB${info.allspace ? ` of ${info.allspace} KB` : ""}${status}`;
-    cell.classList.toggle("bad", this.imageKb > 0 && !fits);
+    cell.textContent = `${info.freespace} KB${info.allspace ? ` of ${info.allspace} KB` : ""} `;
+    if (this.imageKb) {
+      const fits = this.imageKb <= info.freespace;
+      const tag = document.createElement("span");
+      tag.className = "badge";
+      tag.dataset["variant"] = fits ? "success" : "danger";
+      tag.textContent = fits ? `list needs ${this.imageKb} KB, fits` : `list needs ${this.imageKb} KB, does not fit`;
+      cell.append(tag);
+    }
   }
 
   private async toggle(): Promise<void> {
@@ -77,6 +88,7 @@ export class BadgeConnect extends HTMLElement {
 
   private setState(connected: boolean): void {
     this.button.textContent = connected ? "Disconnect" : "Connect badge";
+    this.button.dataset["variant"] = connected ? "secondary" : "";
     this.status.textContent = connected ? `connected to ${this.badge?.name ?? "badge"}` : "not connected";
     if (!connected) this.infoEl.hidden = true;
     this.dispatchEvent(new CustomEvent("connection", { detail: connected, bubbles: true }));
@@ -86,9 +98,9 @@ export class BadgeConnect extends HTMLElement {
     const set = (f: string, v: string) => (this.querySelector<HTMLElement>(`[data-f="${f}"]`)!.textContent = v);
     set("name", this.badge?.name ?? "");
     set("size", info.size.replace(",", "×"));
-    this.updateFree();
     set("gap", `${info.time_mode === 1 ? 10 : 80} ms (time_mode ${info.time_mode})`);
     set("add", info.ADD);
+    this.updateFree();
     this.infoEl.hidden = false;
   }
 }

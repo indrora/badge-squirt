@@ -48,16 +48,16 @@ export class ImagePicker extends HTMLElement {
         <canvas class="preview" hidden></canvas>
         <span class="hint">add a picture to start</span>
       </div>
-      <div class="controls">
+      <div class="hstack mt-4 controls">
         <label>zoom <input type="range" class="zoom" min="1" max="${MAX_ZOOM}" step="0.01" value="1" disabled></label>
-        <button type="button" class="reset" disabled>reset</button>
+        <button type="button" class="reset outline" data-variant="secondary" disabled>reset</button>
       </div>
-      <div class="controls">
-        <label>quality <input type="range" class="quality" min="0.1" max="1" step="0.05" value="0.7" disabled> <output></output></label>
+      <div class="hstack mt-2 controls">
+        <label>quality <output></output> <input type="range" class="quality" min="0.1" max="1" step="0.05" value="0.7" disabled></label>
       </div>
-      <div class="controls readout-row">
-        <span class="readout" aria-live="polite"></span>
-        <span class="encoded-tag" hidden>showing encoded JPEG</span>
+      <div class="hstack mt-2 readout-row">
+        <span class="readout text-light" aria-live="polite"></span>
+        <span class="encoded-tag badge" data-variant="secondary" hidden>showing encoded JPEG</span>
       </div>`;
     this.drop = this.querySelector(".drop")!;
     this.canvas = this.querySelector("canvas")!;
@@ -87,6 +87,12 @@ export class ImagePicker extends HTMLElement {
   attach(store: ImageStore): void {
     this.store = store;
     store.on("select", (e) => this.show(e.detail));
+    // The store encodes a freshly added entry itself; when that lands for the entry we
+    // are showing, paint it. Scheduling our own encode here as well used to double the
+    // work for every GIF and revoke the preview URL the list thumbnail was using.
+    store.on("update", (e) => {
+      if (e.detail === this.entry && !this.encodeTimer) void this.paintEncoded(e.detail, this.encodeSerial);
+    });
   }
 
   attributeChangedCallback(_name: string, oldValue: string | null, newValue: string | null): void {
@@ -118,8 +124,9 @@ export class ImagePicker extends HTMLElement {
     this.slider.value = String(entry.quality);
     this.querySelector("output")!.textContent = entry.quality.toFixed(2);
     this.draw();
-    // If the entry already has an encode for this size, show it straight away.
-    if (entry.prepared && entry.prepared.width === this.size.width && entry.prepared.height === this.size.height) {
+    if (!entry.prepared) return; // store.add is encoding; the "update" listener paints it
+    // Already encoded: show it straight away, unless the badge's size changed meanwhile.
+    if (entry.prepared.width === this.size.width && entry.prepared.height === this.size.height) {
       void this.paintEncoded(entry, this.encodeSerial);
     } else {
       this.scheduleEncode();
@@ -135,7 +142,8 @@ export class ImagePicker extends HTMLElement {
       this.canvas.width = width;
       this.canvas.height = height;
     }
-    drawView(this.canvas.getContext("2d")!, this.entry.bitmap, width, height, this.entry.view);
+    // A GIF is edited through its first frame; the same view/quality applies to every frame.
+    drawView(this.canvas.getContext("2d")!, this.entry.frames[0]!, width, height, this.entry.view);
     this.zoomSlider.value = String(this.entry.view.zoom);
   }
 
@@ -143,7 +151,7 @@ export class ImagePicker extends HTMLElement {
   private setView(view: View): void {
     if (!this.entry) return;
     const { width, height } = this.size;
-    this.entry.view = clampView(view, this.entry.bitmap, width, height);
+    this.entry.view = clampView(view, this.entry.frames[0]!, width, height);
     this.draw();
     this.querySelector<HTMLElement>(".encoded-tag")!.hidden = true; // live source until the encode lands
     this.scheduleEncode();
@@ -217,6 +225,7 @@ export class ImagePicker extends HTMLElement {
   }
 
   private async encode(): Promise<void> {
+    this.encodeTimer = 0;
     if (!this.entry || !this.store) return;
     const entry = this.entry;
     const serial = ++this.encodeSerial;
@@ -228,7 +237,7 @@ export class ImagePicker extends HTMLElement {
   /** Decode the entry's encoded JPEG and paint it; skipped if a newer encode/selection happened. */
   private async paintEncoded(entry: ImageEntry, serial: number): Promise<void> {
     if (!entry.prepared) return;
-    const decoded = await createImageBitmap(new Blob([new Uint8Array(entry.prepared.jpeg)], { type: "image/jpeg" }));
+    const decoded = await createImageBitmap(new Blob([new Uint8Array(entry.prepared.frames[0]!)], { type: "image/jpeg" }));
     if (serial !== this.encodeSerial || entry !== this.entry) {
       decoded.close();
       return;
@@ -236,7 +245,11 @@ export class ImagePicker extends HTMLElement {
     this.canvas.getContext("2d")!.drawImage(decoded, 0, 0);
     decoded.close();
     this.querySelector<HTMLElement>(".encoded-tag")!.hidden = false;
-    this.readout.textContent = `${formatBytes(entry.prepared.jpeg.length)} JPEG, ${neededKb(entry.prepared.jpeg.length)} KB on the badge`;
+    const p = entry.prepared;
+    this.readout.textContent =
+      p.frames.length > 1
+        ? `${p.frames.length} frames, ${formatBytes(p.bytes)} JPEG total, ${neededKb(p.bytes)} KB on the badge`
+        : `${formatBytes(p.bytes)} JPEG, ${neededKb(p.bytes)} KB on the badge`;
   }
 }
 

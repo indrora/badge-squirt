@@ -2,13 +2,17 @@
  * <image-list> — the stack of pictures: add (file picker, multiple), select, remove.
  *
  * Each row shows the encoded thumbnail (so it reflects crop and quality), the file name
- * and the encoded size. Clicking a row selects it in the store; the editor follows the
- * store's "select" event. Drop and paste anywhere on the page also add pictures — that
- * is wired here because "add" is this component's job, wherever the gesture lands.
+ * and the encoded size; an animated entry (GIF) also shows its frame count and native
+ * frame time. Clicking a row selects it in the store; the editor follows the store's
+ * "select" event. Drop and paste anywhere on the page also add pictures — that is wired
+ * here because "add" is this component's job, wherever the gesture lands.
+ *
+ * Markup follows Oat (oat.ink): plain <button>s with data-variant, `.hstack`, `.badge`,
+ * `ul.unstyled`; only the row grid is ours (index.html).
  */
 
 import { formatBytes } from "../image.js";
-import type { ImageEntry, ImageStore } from "../model.js";
+import { isAnimated, nativeIntervalMs, type ImageEntry, type ImageStore } from "../model.js";
 
 export class ImageList extends HTMLElement {
   private store: ImageStore | null = null;
@@ -18,12 +22,12 @@ export class ImageList extends HTMLElement {
 
   connectedCallback(): void {
     this.innerHTML = `
-      <div class="row">
-        <button type="button" class="primary add">Add pictures…</button>
+      <div class="hstack">
+        <button type="button" class="add">Add pictures…</button>
         <input type="file" accept="image/*" multiple hidden>
-        <span class="status hint">or drop / paste images anywhere</span>
+        <span class="text-light hint">or drop / paste images anywhere · GIFs keep their frames</span>
       </div>
-      <ul class="entries"></ul>`;
+      <ul class="entries unstyled mt-4"></ul>`;
     this.list = this.querySelector("ul")!;
     this.input = this.querySelector("input")!;
     this.querySelector(".add")!.addEventListener("click", () => this.input.click());
@@ -72,8 +76,8 @@ export class ImageList extends HTMLElement {
     li.innerHTML = `
       <img class="thumb" alt="">
       <span class="name"></span>
-      <span class="meta"></span>
-      <button type="button" class="remove" title="remove">✕</button>`;
+      <span class="meta text-light"></span>
+      <button type="button" class="remove ghost" data-variant="danger" title="remove">✕</button>`;
     li.addEventListener("click", (e) => {
       if ((e.target as HTMLElement).closest(".remove")) this.store!.remove(entry);
       else this.store!.select(entry);
@@ -88,14 +92,22 @@ export class ImageList extends HTMLElement {
   }
 
   private fill(li: HTMLLIElement, entry: ImageEntry): void {
-    li.querySelector<HTMLElement>(".name")!.textContent = entry.name;
+    const name = li.querySelector<HTMLElement>(".name")!;
+    name.textContent = entry.name;
+    if (isAnimated(entry)) {
+      const tag = document.createElement("span");
+      tag.className = "badge";
+      tag.dataset["variant"] = "secondary";
+      tag.textContent = `${entry.frames.length} frames · ${nativeIntervalMs(entry)} ms`;
+      name.append(" ", tag);
+    }
     const img = li.querySelector<HTMLImageElement>(".thumb")!;
+    const meta = li.querySelector<HTMLElement>(".meta")!;
     if (entry.prepared) {
       img.src = entry.prepared.previewUrl;
-      li.querySelector<HTMLElement>(".meta")!.textContent =
-        `${formatBytes(entry.prepared.jpeg.length)} · q${entry.quality.toFixed(2)}`;
+      meta.textContent = `${formatBytes(entry.prepared.bytes)} · q${entry.quality.toFixed(2)}`;
     } else {
-      li.querySelector<HTMLElement>(".meta")!.textContent = "encoding…";
+      meta.textContent = "encoding…";
     }
   }
 }

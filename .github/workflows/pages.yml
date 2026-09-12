@@ -46,9 +46,12 @@ jobs:
       - run: npm test
       - name: Assemble site
         run: |
-          mkdir -p ../site/dist
+          mkdir -p ../site/dist ../site/node_modules/@knadh/oat
           cp index.html ../site/
           cp -R dist/src ../site/dist/src
+          # Oat is an npm dependency, not vendored: index.html references it under
+          # node_modules/ so the same path works locally and on Pages. Copy only its two files.
+          cp node_modules/@knadh/oat/oat.min.css node_modules/@knadh/oat/oat.min.js ../site/node_modules/@knadh/oat/
           # Tag name (or branch) shown in the footer via a tiny generated file the page can fetch.
           echo "${GITHUB_REF_NAME}" > ../site/VERSION
       - uses: actions/upload-pages-artifact@v3

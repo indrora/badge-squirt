@@ -12,15 +12,27 @@
  *   update   — one entry's encode finished (detail: entry)
  */
 
-import { DEFAULT_QUALITY, IDENTITY_VIEW, loadBitmap, prepareImage, type PreparedImage, type View } from "./image.js";
+import { DEFAULT_QUALITY, IDENTITY_VIEW, decodeFrames, prepareImage, type PreparedImage, type View } from "./image.js";
 
 export interface ImageEntry {
   id: number;
   name: string;
-  bitmap: ImageBitmap;
+  /** Source frames: one for a still, one per frame for a GIF. The editor shows frames[0]. */
+  frames: ImageBitmap[];
+  /** Display time per frame in ms as the file declared it (0 for a still). */
+  durationsMs: number[];
   view: View;
   quality: number;
   prepared: PreparedImage | null;
+}
+
+/** True when the entry came from an animated file. */
+export const isAnimated = (e: ImageEntry): boolean => e.frames.length > 1;
+
+/** The file's own frame time (median), for sending a GIF with its native timing. */
+export function nativeIntervalMs(e: ImageEntry): number {
+  const d = [...e.durationsMs].sort((a, b) => a - b);
+  return d[Math.floor(d.length / 2)] || 100;
 }
 
 /** Frame-pack limits for the animated upload: fewer than 2 is a still, more than 5 is a lot of flash. */
@@ -45,10 +57,12 @@ export class ImageStore extends EventTarget {
 
   /** Decode, append, select, and produce a first encode at the given output size. */
   async add(file: File, width: number, height: number): Promise<ImageEntry> {
+    const src = await decodeFrames(file);
     const entry: ImageEntry = {
       id: this.nextId++,
       name: file.name,
-      bitmap: await loadBitmap(file),
+      frames: src.frames,
+      durationsMs: src.durationsMs,
       view: { ...IDENTITY_VIEW },
       quality: DEFAULT_QUALITY,
       prepared: null,
@@ -65,7 +79,7 @@ export class ImageStore extends EventTarget {
     if (i < 0) return;
     this.entries.splice(i, 1);
     if (entry.prepared) URL.revokeObjectURL(entry.prepared.previewUrl);
-    entry.bitmap.close();
+    for (const f of entry.frames) f.close();
     this.emit("change", this.entries);
     if (this.selected === entry) this.select(this.entries[Math.min(i, this.entries.length - 1)] ?? null);
   }
@@ -78,7 +92,7 @@ export class ImageStore extends EventTarget {
 
   /** Re-encode `entry` from its current view/quality; the previous preview URL is released. */
   async encode(entry: ImageEntry, width: number, height: number): Promise<PreparedImage> {
-    const prepared = await prepareImage(entry.bitmap, width, height, entry.quality, entry.view);
+    const prepared = await prepareImage(entry.frames, width, height, entry.quality, entry.view);
     if (entry.prepared) URL.revokeObjectURL(entry.prepared.previewUrl);
     entry.prepared = prepared;
     this.emit("update", entry);
