@@ -1,11 +1,9 @@
-# vendor artefacts (16 MB APK + unpacked tree) and test photos stay out of the repo
+# vendor artefacts (16 MB APK + unpacked tree) stay out of the repo
 _apk/
 e-Goods.apk
-*.jpg
-*.jpeg
-*.png
 .DS_Store
 node_modules/
-dist/
+web/dist/
 test-results/
 playwright-report/
+__pycache__/

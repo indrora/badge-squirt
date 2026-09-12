@@ -1,0 +1,15 @@
+{
+  "type": 13,
+  "allspace": 16384,
+  "freespace": 5500,
+  "devname": "",
+  "size": "368,368",
+  "screen": "0",
+  "ADD": "79,3F,75,2B,7F,E6",
+  "time_mode": 1,
+  "brand": 0
+}
+
+free space: 5500 KB, image target: 368x368
+
+Note: the known protocol has no command to list images; this is all the device reports.

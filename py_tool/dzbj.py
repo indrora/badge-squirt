@@ -17,7 +17,7 @@ dzbj.py — minimal BLE client for the "DZBJ-" digital display badge (E-Goods ap
   uv run dzbj.py probe 7                  # send {"type":7} (VERSION_QUERY) and dump replies
   uv run dzbj.py probe 13 '{"devname":"x"}'  # send a JSON command with extra fields
 
-Protocol recovered from e-Goods.apk v1.0.50; see dzbj-badge-ble-protocol.md.
+Protocol recovered from e-Goods.apk v1.0.50; see doc/dzbj-badge-ble-protocol.md.
 """
 
 from __future__ import annotations
