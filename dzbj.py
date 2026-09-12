@@ -6,8 +6,12 @@
 """
 dzbj.py — minimal BLE client for the "DZBJ-" digital display badge (E-Goods app protocol).
 
+  uv run dzbj.py scan --wait 15           # dump advertisement data of everything named DZBJ-*
   uv run dzbj.py dump                     # connect, print every GATT service/characteristic
   uv run dzbj.py info                     # connect, print the device's info report
+  uv run dzbj.py listen --wait 20         # connect, subscribe to everything, log all frames
+  uv run dzbj.py rawsend img.jpg --container imb --envelope --framing c0 --count 3
+                                          # receive-mode format probing: see cmd_rawsend
   uv run dzbj.py add photo.png            # upload one still (ALBUM, type 6)
   uv run dzbj.py remove NAME              # not in the known protocol — see probe
   uv run dzbj.py probe 7                  # send {"type":7} (VERSION_QUERY) and dump replies
@@ -31,6 +35,11 @@ from bleak import BleakClient, BleakScanner
 from PIL import Image
 
 NAME_PREFIX = "DZBJ-"
+# The ADV packet carries the *shortened* local name "DZB"; the full "DZBJ-TV07(BLE)" only
+# arrives in the scan response, which macOS sometimes never delivers to us. Match on the
+# short form and on the advertised service UUID (AF30, Jieli convention) as well.
+SHORT_PREFIX = "DZB"
+UUID_ADV_SERVICE = "0000af30-0000-1000-8000-00805f9b34fb"
 UUID_SERVICE = "000001c0-0000-1000-8000-00805f9b34fb"
 UUID_WRITE = "000001c1-0000-1000-8000-00805f9b34fb"
 UUID_NOTIFY = "000001c2-0000-1000-8000-00805f9b34fb"
@@ -94,8 +103,11 @@ def prepare_jpeg(path: str, w: int, h: int, quality: int = 100) -> bytes:
 # ----------------------------------------------------------------------------- BLE session
 
 class Badge:
-    def __init__(self, verbose: bool = False, subscribe: bool = True):
+    def __init__(self, verbose: bool = False, subscribe: bool = True,
+                 info_wait: float = 4.0, listen_all: bool = False):
         self.subscribe = subscribe
+        self.info_wait = info_wait      # receive mode never sends type 13 and drops us after ~4 s idle
+        self.listen_all = listen_all    # extra CCCD writes cost time we may not have
         self.client: BleakClient | None = None
         # Resolved at connect time (see _resolve_chars); never assume the UUIDs above exist.
         self.write_char = None
@@ -107,12 +119,14 @@ class Badge:
 
     async def __aenter__(self):
         dev = await BleakScanner.find_device_by_filter(
-            lambda d, ad: bool((d.name or ad.local_name or "").startswith(NAME_PREFIX)), timeout=15.0
+            lambda d, ad: (d.name or ad.local_name or "").startswith(SHORT_PREFIX)
+            or UUID_ADV_SERVICE in ad.service_uuids,
+            timeout=15.0,
         )
         if dev is None:
             sys.exit(f"no device named {NAME_PREFIX}* found")
         print(f"connecting to {dev.name} ({dev.address})", file=sys.stderr)
-        self.client = BleakClient(dev, timeout=20.0)
+        self.client = BleakClient(dev, timeout=20.0, disconnected_callback=self._on_disconnect)
         await self.client.connect()
         try:
             mtu = self.client.mtu_size
@@ -123,9 +137,11 @@ class Badge:
             return self
         self._resolve_chars()
         await self._subscribe()
-        # device pushes its info JSON shortly after notify is enabled
-        for _ in range(40):
-            if self.info:
+        # App mode: device pushes its info JSON shortly after notify is enabled.
+        # Receive mode (double-tap): nothing is pushed and the badge disconnects after a few
+        # seconds of silence, so callers pass info_wait=0 and start writing immediately.
+        for _ in range(int(self.info_wait * 10)):
+            if self.info or self.failed.is_set():
                 break
             await asyncio.sleep(0.1)
         return self
@@ -209,7 +225,7 @@ class Badge:
                       f"(response={self.write_response})", file=sys.stderr)
                 # Best effort: also listen on every other notify char (AE02/AE04/AE05) so we
                 # can see which one the per-packet acks come out of. Failures are fine.
-                for extra in self.notify_candidates:
+                for extra in (self.notify_candidates if self.listen_all else []):
                     if extra is ch:
                         continue
                     try:
@@ -234,6 +250,13 @@ class Badge:
                 for d in ch.descriptors:
                     lines.append(f"    desc {d.uuid}  handle={d.handle}")
         return "\n".join(lines)
+
+    def _on_disconnect(self, _client):
+        # The badge drops the link itself in several situations (receive-mode timeout,
+        # foreign central, or just its idle timer). Say so instead of letting bleak raise
+        # "Service Discovery has not been performed yet" from the next call.
+        print(f"\n!! badge disconnected after {len(self.log)} frame(s)", file=sys.stderr)
+        self.failed.set()
 
     def _on_notify(self, _sender, data: bytearray):
         data = bytes(data)
@@ -286,7 +309,7 @@ class Badge:
         self.failed.clear()
         for i, p in enumerate(pkts, 1):
             if self.failed.is_set():
-                sys.exit(f"device reported {{GetPacketFail}} before packet {i}/{len(pkts)}")
+                sys.exit(f"device reported {{GetPacketFail}} or disconnected before packet {i}/{len(pkts)}")
             await self.write(p)
             print(f"\r{i}/{len(pkts)} packets", end="", file=sys.stderr)
             await asyncio.sleep(gap)
@@ -298,9 +321,57 @@ class Badge:
 
 # ----------------------------------------------------------------------------- commands
 
+async def cmd_scan(args):
+    """
+    Print every advertisement whose name matches --prefix (default DZBJ-), with all the
+    fields CoreBluetooth exposes. Used to learn what a badge in "waiting to receive" mode
+    advertises so fakebadge.py can mimic it (the sharing badge connects to "the first badge
+    that listens", so it must be filtering on name, service UUID or manufacturer data).
+    """
+    seen: dict[str, str] = {}
+
+    def cb(dev, ad):
+        name = dev.name or ad.local_name or ""
+        vendor = any(u[4:6] in ("ae", "af") for u in ad.service_uuids)
+        if not name.startswith(args.prefix) and not (args.all and vendor) and UUID_ADV_SERVICE not in ad.service_uuids:
+            return
+        desc = (f"name={name!r} rssi={ad.rssi} services={ad.service_uuids} "
+                f"mfg={{{', '.join(f'{k:#06x}: {v.hex()}' for k, v in ad.manufacturer_data.items())}}} "
+                f"svcdata={{{', '.join(f'{k}: {v.hex()}' for k, v in ad.service_data.items())}}} "
+                f"tx={ad.tx_power}")
+        if seen.get(dev.address) != desc:
+            seen[dev.address] = desc
+            print(f"{dev.address}  {desc}")
+
+    async with BleakScanner(cb):
+        await asyncio.sleep(args.wait)
+    if not seen:
+        print(f"nothing named {args.prefix}* seen in {args.wait}s")
+
+
 async def cmd_dump(args):
     async with Badge(verbose=args.verbose, subscribe=False) as b:
         print(b.gatt_dump())
+
+
+async def cmd_listen(args):
+    """
+    Passive capture: connect, subscribe to every notify/indicate characteristic, send
+    nothing, print every frame with its source characteristic. Meant for poking at the
+    badge's own modes (double-tap "waiting to receive", long-press "share") where the
+    GATT table and any unsolicited handshake differ from the app-facing mode.
+    """
+    async with Badge(verbose=True, listen_all=True) as b:
+        if not b.client.is_connected:
+            sys.exit("badge disconnected before service discovery finished")
+        print(b.gatt_dump())
+        print(f"listening {args.wait}s ...", file=sys.stderr)
+        before = len(b.log)
+        for _ in range(int(args.wait * 10)):
+            if b.failed.is_set():
+                break
+            await asyncio.sleep(0.1)
+        print(f"{len(b.log) - before} frame(s) received while listening")
 
 
 async def cmd_info(args):
@@ -314,7 +385,10 @@ async def cmd_info(args):
 
 
 async def cmd_add(args):
-    async with Badge(verbose=args.verbose) as b:
+    async with Badge(verbose=args.verbose, info_wait=0.0 if args.no_wait else 4.0,
+                     listen_all=args.listen_all) as b:
+        if b.failed.is_set():
+            sys.exit("badge disconnected during connect/subscribe")
         w, h = b.size
         jpeg = prepare_jpeg(args.image, w, h, args.quality)
         blob = imb_container(jpeg, w, h)
@@ -327,6 +401,71 @@ async def cmd_add(args):
         pkts = fragment_image(TYPE["ALBUM"], blob, args.chunk)
         await b.send_packets(pkts, gap)
         print("upload finished")
+
+
+async def cmd_rawsend(args):
+    """
+    Format probe for the badge's double-tap "waiting to receive" mode.
+
+    Receive mode does not speak the app protocol: pushing the normal 0xC0-framed
+    '{"type":6,"data":<IMB>}' stream got a bare ASCII "fail" on AE02 after ~4 packets and a
+    disconnect. Replies there are unframed text, so the expected input is probably simpler
+    too. This command builds the payload from switches so each double-tap tests one guess:
+
+      --container imb|jpeg|none   IMB\0 header + JPEG, bare JPEG, or --text only
+      --envelope / --no-envelope  wrap in '{"type":6,"data":' ... '}'
+      --framing c0|none           0xC0 fragment packets, or raw chunks
+      --chunk N --count K         chunk size and how many chunks to send (0 = all)
+      --text STR                  send this UTF-8 string first (handshake guesses)
+      --wait S                    seconds to collect replies after the last write
+    """
+    from pathlib import Path
+    blob = b""
+    if args.container != "none":
+        w, h = 368, 368
+        jpeg = prepare_jpeg(args.image, w, h, args.quality)
+        blob = imb_container(jpeg, w, h) if args.container == "imb" else jpeg
+    if args.envelope:
+        blob = b'{"type":6,"data":' + blob + b"}"
+    if args.framing == "c0":
+        n = math.ceil(len(blob) / args.chunk) if blob else 0
+        chunks = [packet(TYPE["ALBUM"], blob[i * args.chunk:(i + 1) * args.chunk], n, n - i - 1) for i in range(n)]
+    else:
+        chunks = [blob[i:i + args.chunk] for i in range(0, len(blob), args.chunk)]
+    if args.count:
+        chunks = chunks[:args.count]
+    # Handshake guesses go first, each followed by a pause so a reply can be attributed.
+    texts = [t.encode() for t in (args.text or [])]
+    print(f"payload {len(blob)} B -> {len(chunks)} chunk(s); first: {chunks[0][:48].hex() if chunks else '-'}", file=sys.stderr)
+
+    async with Badge(verbose=True, info_wait=0.0) as b:
+        if b.failed.is_set():
+            sys.exit("badge disconnected during connect/subscribe")
+        t0 = time.time()
+        sent = 0
+        for t in texts:
+            if b.failed.is_set():
+                break
+            n_before = len(b.log)
+            await b.write(t)
+            print(f"-> text {t!r}", file=sys.stderr)
+            await asyncio.sleep(args.textwait)
+            for _, d in b.log[n_before:]:
+                print(f"   <- {d.decode('ascii', errors='replace')!r}", file=sys.stderr)
+        for c in chunks:
+            if b.failed.is_set():
+                break
+            await b.write(c)
+            sent += 1
+            await asyncio.sleep(args.gap)
+        print(f"sent {sent}/{len(chunks)} chunk(s) in {time.time() - t0:.2f}s; waiting {args.wait}s", file=sys.stderr)
+        for _ in range(int(args.wait * 10)):
+            if b.failed.is_set():
+                break
+            await asyncio.sleep(0.1)
+        for t, d in b.log:
+            print(f"  +{t - t0:6.3f}s  {d.hex()}  {d.decode('ascii', errors='replace')!r}")
+        print(f"{len(b.log)} reply frame(s); disconnected={b.failed.is_set()}")
 
 
 async def cmd_remove(args):
@@ -361,8 +500,16 @@ def main():
     ap.add_argument("-v", "--verbose", action="store_true", help="dump every notification")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    p = sub.add_parser("scan", help="dump advertisement data of nearby badges")
+    p.add_argument("--wait", type=float, default=15.0)
+    p.add_argument("--prefix", default=NAME_PREFIX)
+    p.add_argument("--all", action="store_true", help="also show nameless devices advertising an AExx/AFxx service")
+    p.set_defaults(fn=cmd_scan)
     sub.add_parser("dump", help="print the device's GATT services/characteristics").set_defaults(fn=cmd_dump)
     sub.add_parser("info", help="print the device's info report").set_defaults(fn=cmd_info)
+    p = sub.add_parser("listen", help="subscribe to everything and log frames without sending")
+    p.add_argument("--wait", type=float, default=20.0, help="seconds to listen")
+    p.set_defaults(fn=cmd_listen)
 
     p = sub.add_parser("add", help="upload one still image (ALBUM)")
     p.add_argument("image")
@@ -370,7 +517,23 @@ def main():
     p.add_argument("--chunk", type=int, default=ALBUM_CHUNK, help="payload bytes per packet (app: 496)")
     p.add_argument("--force", action="store_true", help="skip the free-space check")
     p.add_argument("--gap", type=float, default=None, help="seconds between packets (default: 0.01 if time_mode==1 else 0.08)")
+    p.add_argument("--no-wait", action="store_true", help="don't wait for the info report (badge in receive mode)")
+    p.add_argument("--listen-all", action="store_true", help="also subscribe to every other notify characteristic")
     p.set_defaults(fn=cmd_add)
+
+    p = sub.add_parser("rawsend", help="receive-mode format probe (see docstring)")
+    p.add_argument("image", nargs="?", default="sniffit.jpg")
+    p.add_argument("--container", choices=["imb", "jpeg", "none"], default="imb")
+    p.add_argument("--envelope", action=argparse.BooleanOptionalAction, default=True)
+    p.add_argument("--framing", choices=["c0", "none"], default="c0")
+    p.add_argument("--chunk", type=int, default=ALBUM_CHUNK)
+    p.add_argument("--count", type=int, default=0, help="chunks to send (0 = all)")
+    p.add_argument("--text", action="append", help="UTF-8 string to write first (repeatable, sent in order)")
+    p.add_argument("--textwait", type=float, default=0.7, help="pause after each --text to collect a reply")
+    p.add_argument("--gap", type=float, default=0.01)
+    p.add_argument("--wait", type=float, default=3.0)
+    p.add_argument("--quality", type=int, default=100)
+    p.set_defaults(fn=cmd_rawsend)
 
     p = sub.add_parser("remove", help="(not available in the known protocol)")
     p.add_argument("name")

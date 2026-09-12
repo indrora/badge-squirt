@@ -224,3 +224,21 @@ def framepack(jpegs, w, h, interval_ms):
 # still:   for p in fragment(ALBUM,   imb(jpeg, 368, 368), 496): write(p); sleep(0.08)
 # frames:  for p in fragment(DYNAMIC, framepack(jpegs, 368, 368, 100), 426): write(p); sleep(0.08)
 ```
+
+## 7. Badge-to-badge share mode (firmware only, not in the app) — findings 2026-09-12
+
+* **Double-tap** = "waiting to receive": badge stays a peripheral, same advertisement
+  (name `DZBJ-TV07(BLE)`, service UUID **AF30** in the ADV, no manufacturer data), but the
+  GATT behaviour differs: `AE02` now accepts its CCCD write, **no** type-13 info report is
+  pushed, and the badge drops a central that subscribes and stays silent within ~4 s.
+  Writing the normal ALBUM stream to `AE01` made it show "receiving..." and then it
+  disconnected mid-stream (80 ms pacing, no flow-control at the time — untested since).
+* **Long-press** = "share": badge becomes a central, stops advertising entirely, and
+  connects to the first thing advertising as a badge. Against a Mac (`fakebadge.py`, bless)
+  advertising `DZBJ-TV07(BLE)` + AF30/AE30/AE3A it connected, showed "sending..." for a
+  moment, then sat on the link for ~10 s issuing **zero** ATT requests (no MTU exchange,
+  no discovery, no CCCD write) until bluetoothd dropped it as "unused". Best guess: the
+  sharer expects the receiver to push its info frame *without* a subscription (Jieli
+  firmware notifies regardless of CCCD); CoreBluetooth refuses to notify an unsubscribed
+  central, so a Mac cannot impersonate a receiving badge. A sniffer or a non-Apple stack
+  (BlueZ, ESP32) is needed to capture the sender side.
