@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["bleak>=0.22", "pillow>=10"]
+# dependencies = ["bleak>=0.22", "pillow>=10", "rich>=13"]
 # ///
 """
 dzbj.py — minimal BLE client for the "DZBJ-" digital display badge (E-Goods app protocol).
@@ -33,6 +33,11 @@ import time
 
 from bleak import BleakClient, BleakScanner
 from PIL import Image
+from rich.console import Console
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn, TransferSpeedColumn
+
+# All human-facing chatter goes to stderr via rich so stdout stays scriptable (JSON etc).
+console = Console(stderr=True)
 
 NAME_PREFIX = "DZBJ-"
 # The ADV packet carries the *shortened* local name "DZB"; the full "DZBJ-TV07(BLE)" only
@@ -55,6 +60,7 @@ TYPE = {
 }
 
 ALBUM_CHUNK = 496        # app uses 496 for stills (8B header + 496 + 1B checksum = 505 <= MTU 512)
+JPEG_QUALITY = 70        # app uses 100, which is ~3x the bytes for no visible gain on a 368px round panel
 PACKET_GAP_S = 0.08      # app sleeps 80 ms between packets (10 ms if device time_mode == 1)
 
 
@@ -305,18 +311,40 @@ class Badge:
                     await asyncio.sleep(0.01)
         await self.client.write_gatt_char(self.write_char, pkt, response=self.write_response)
 
-    async def send_packets(self, pkts: list[bytes], gap: float):
+    async def send_packets(self, pkts: list[bytes], gap: float, progress: Progress | None = None,
+                           label: str = "upload"):
+        """Stream packets with pacing; draws a rich bar on `progress` if given."""
         self.failed.clear()
-        for i, p in enumerate(pkts, 1):
-            if self.failed.is_set():
-                sys.exit(f"device reported {{GetPacketFail}} or disconnected before packet {i}/{len(pkts)}")
-            await self.write(p)
-            print(f"\r{i}/{len(pkts)} packets", end="", file=sys.stderr)
-            await asyncio.sleep(gap)
-        print(file=sys.stderr)
-        await asyncio.sleep(0.5)
+        total_bytes = sum(len(p) for p in pkts)
+        own = progress is None
+        if own:
+            progress = make_progress()
+            progress.start()
+        task = progress.add_task(label, total=total_bytes)
+        try:
+            for i, p in enumerate(pkts, 1):
+                if self.failed.is_set():
+                    sys.exit(f"device reported {{GetPacketFail}} or disconnected before packet {i}/{len(pkts)}")
+                await self.write(p)
+                progress.update(task, advance=len(p))
+                await asyncio.sleep(gap)
+            await asyncio.sleep(0.5)
+        finally:
+            if own:
+                progress.stop()
         if self.failed.is_set():
             sys.exit("device reported {GetPacketFail}")
+
+
+def make_progress() -> Progress:
+    return Progress(
+        TextColumn("[bold]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TransferSpeedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    )
 
 
 # ----------------------------------------------------------------------------- commands
@@ -396,21 +424,25 @@ async def cmd_add(args):
         # badge's idle timer is short, so re-dialling per image is the worst of both worlds.
         # After each upload the badge shows "Updating..." while it writes flash and renders;
         # --pause gives it that time before the next stream starts (no ack to wait for).
-        for idx, image in enumerate(args.image, 1):
-            jpeg = prepare_jpeg(image, w, h, args.quality)
-            blob = imb_container(jpeg, w, h)
-            need_kb = math.ceil(len(blob) / 1024)
-            print(f"[{idx}/{len(args.image)}] {image}: jpeg {len(jpeg)} B, container {len(blob)} B "
-                  f"(~{need_kb} KB), device free {free} KB", file=sys.stderr)
-            if isinstance(free, int) and need_kb > free and not args.force:
-                sys.exit("not enough free space on device (use --force to send anyway)")
-            pkts = fragment_image(TYPE["ALBUM"], blob, args.chunk)
-            await b.send_packets(pkts, gap)
-            if isinstance(free, int):
-                free -= need_kb           # device never re-reports; keep our own estimate
-            print(f"[{idx}/{len(args.image)}] upload finished")
-            if idx < len(args.image):
-                await asyncio.sleep(args.pause)
+        with make_progress() as progress:
+            overall = progress.add_task("images", total=len(args.image)) if len(args.image) > 1 else None
+            for idx, image in enumerate(args.image, 1):
+                jpeg = prepare_jpeg(image, w, h, args.quality)
+                blob = imb_container(jpeg, w, h)
+                need_kb = math.ceil(len(blob) / 1024)
+                console.print(f"[cyan]{image}[/]: jpeg {len(jpeg):,} B at q{args.quality}, "
+                              f"~{need_kb} KB, device free {free} KB")
+                if isinstance(free, int) and need_kb > free and not args.force:
+                    sys.exit("not enough free space on device (use --force to send anyway)")
+                pkts = fragment_image(TYPE["ALBUM"], blob, args.chunk)
+                await b.send_packets(pkts, gap, progress, label=image)
+                if isinstance(free, int):
+                    free -= need_kb           # device never re-reports; keep our own estimate
+                if overall is not None:
+                    progress.update(overall, advance=1)
+                if idx < len(args.image):
+                    await asyncio.sleep(args.pause)
+        console.print(f"[green]done[/]: {len(args.image)} image(s) uploaded")
 
 
 async def cmd_rawsend(args):
@@ -524,7 +556,7 @@ def main():
     p = sub.add_parser("add", help="upload one or more still images (ALBUM) on a single connection")
     p.add_argument("image", nargs="+")
     p.add_argument("--pause", type=float, default=2.0, help="seconds to let the badge render between images")
-    p.add_argument("--quality", type=int, default=100, help="JPEG quality (app uses 100)")
+    p.add_argument("--quality", "-q", type=int, default=JPEG_QUALITY, help=f"JPEG quality 1-100 (default {JPEG_QUALITY}; app uses 100)")
     p.add_argument("--chunk", type=int, default=ALBUM_CHUNK, help="payload bytes per packet (app: 496)")
     p.add_argument("--force", action="store_true", help="skip the free-space check")
     p.add_argument("--gap", type=float, default=None, help="seconds between packets (default: 0.01 if time_mode==1 else 0.08)")
@@ -543,7 +575,7 @@ def main():
     p.add_argument("--textwait", type=float, default=0.7, help="pause after each --text to collect a reply")
     p.add_argument("--gap", type=float, default=0.01)
     p.add_argument("--wait", type=float, default=3.0)
-    p.add_argument("--quality", type=int, default=100)
+    p.add_argument("--quality", "-q", type=int, default=JPEG_QUALITY)
     p.set_defaults(fn=cmd_rawsend)
 
     p = sub.add_parser("remove", help="(not available in the known protocol)")
