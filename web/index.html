@@ -44,6 +44,24 @@
     pre.log { margin: 0; max-height: 260px; overflow: auto; font-size: .78rem; line-height: 1.35;
               background: rgba(127,127,127,.08); padding: .6rem; border-radius: 6px; white-space: pre-wrap; word-break: break-all; }
     .unsupported { color: var(--bad); }
+    /* pictures: list on the left, editor on the right; stacks on narrow screens */
+    .pictures { grid-template-columns: minmax(200px, 1fr) auto; align-items: start; }
+    @media (max-width: 680px) { .pictures { grid-template-columns: 1fr; } }
+    ul.entries { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; max-height: 440px; overflow: auto; }
+    ul.entries li { display: grid; grid-template-columns: 48px 1fr auto; grid-template-rows: auto auto; gap: 0 .6rem; align-items: center;
+                    padding: .3rem .4rem; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
+    ul.entries li:hover { border-color: var(--line); }
+    ul.entries li.selected { border-color: var(--accent); background: rgba(127,127,255,.08); }
+    ul.entries .thumb { grid-row: 1 / span 2; width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #000; }
+    /* every cell pinned: with one item explicitly placed, auto-placement scrambled the rest */
+    ul.entries .name { grid-column: 2; grid-row: 1; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    ul.entries .meta { grid-column: 2; grid-row: 2; font-size: .78rem; color: var(--muted); }
+    ul.entries .remove { grid-column: 3; grid-row: 1 / span 2; padding: .2rem .5rem; }
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 680px) { .panels { grid-template-columns: 1fr; } }
+    .panel { border: 1px solid var(--line); border-radius: 8px; padding: .75rem; display: grid; gap: .5rem; align-content: start; }
+    .panel h3 { margin: 0; font-size: 1rem; }
+    .panel .hint { margin: 0; font-size: .85rem; color: var(--muted); }
     footer { color: var(--muted); font-size: .8rem; text-align: center; } footer a { color: inherit; }
   </style>
 </head>
@@ -52,7 +70,10 @@
     <h1>badge squirt <small>push a still image to a DZBJ- badge over Web Bluetooth</small></h1>
     <p class="unsupported" hidden>This browser has no Web Bluetooth. Use Chrome or Edge on https:// or localhost.</p>
     <section><badge-connect></badge-connect></section>
-    <section><image-picker size="368,368"></image-picker></section>
+    <section class="pictures">
+      <image-list></image-list>
+      <image-picker size="368,368"></image-picker>
+    </section>
     <section><upload-progress></upload-progress></section>
     <section><debug-log></debug-log></section>
     <footer><a href="https://github.com/indrora/badge-squirt">indrora/badge-squirt</a> <span class="version"></span></footer>

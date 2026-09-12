@@ -22,6 +22,7 @@
 
 import {
   ALBUM_CHUNK,
+  DYNAMIC_CHUNK,
   TYPE,
   fragment,
   imbContainer,
@@ -224,15 +225,28 @@ export class Badge extends EventTarget {
    * leave ~2 s between them for the badge to write flash.
    */
   async uploadStill(jpeg: Uint8Array, opts: { gapMs?: number; chunk?: number } = {}): Promise<void> {
-    if (!this.connected || !this.writeChar) throw new Error("not connected");
     const { width, height } = this.size;
-    const blob = imbContainer(jpeg, width, height);
-    const packets = fragment(TYPE.ALBUM, blob, opts.chunk ?? ALBUM_CHUNK);
-    const gap = opts.gapMs ?? this.packetGapMs;
+    await this.send(TYPE.ALBUM, imbContainer(jpeg, width, height), opts.chunk ?? ALBUM_CHUNK, opts.gapMs, "still");
+  }
+
+  /**
+   * Upload a frame-pack container (protocol/packet.ts::framePack) as DYNAMIC_ATMOSPHERE
+   * (type 5). The badge cycles the frames at the interval baked into the container. The
+   * vendor app uses the smaller 426-byte chunk for this command; copied, reason unknown.
+   */
+  async uploadSlideshow(framePackBlob: Uint8Array, opts: { gapMs?: number; chunk?: number } = {}): Promise<void> {
+    await this.send(TYPE.DYNAMIC_ATMOSPHERE, framePackBlob, opts.chunk ?? DYNAMIC_CHUNK, opts.gapMs, "animation");
+  }
+
+  /** Shared envelope → fragment → paced-write loop for both image commands. */
+  private async send(type: number, blob: Uint8Array, chunk: number, gapMs: number | undefined, what: string): Promise<void> {
+    if (!this.connected || !this.writeChar) throw new Error("not connected");
+    const packets = fragment(type, blob, chunk);
+    const gap = gapMs ?? this.packetGapMs;
     const totalBytes = packets.reduce((n, p) => n + p.length, 0);
     this.failed = false;
     this.aborted = false;
-    this.log(`uploading ${jpeg.length} B JPEG as ${packets.length} packets, ${gap} ms apart`);
+    this.log(`uploading ${what}: ${blob.length} B as ${packets.length} packets (type ${type}, chunk ${chunk}), ${gap} ms apart`);
 
     let bytes = 0;
     for (let i = 0; i < packets.length; i++) {

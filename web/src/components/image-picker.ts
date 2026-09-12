@@ -1,59 +1,41 @@
 /**
- * <image-picker> — file picker / drop zone, pan+zoom crop, quality slider, size readout.
+ * <image-picker> — the editor for the *selected* entry: pan+zoom crop, quality slider.
  *
  * The round preview is a live canvas at the badge's native size. The user frames the
  * shot directly on it: drag to pan, wheel / pinch / slider to zoom, double-click to
  * reset. Every gesture redraws the canvas synchronously from the lossless source (cheap
- * at 368 px) and re-encodes the JPEG on a short debounce. Once the encode lands, the
- * *encoded* JPEG is decoded and painted back over the preview, so at rest you are looking
- * at the exact bytes the badge will receive — drag the quality slider and watch the
- * artefacts appear. "image" (detail: PreparedImage) is emitted at the same moment.
+ * at 368 px) and re-encodes the JPEG on a short debounce through the store. Once the
+ * encode lands, the *encoded* JPEG is decoded and painted back over the preview, so at
+ * rest you are looking at the exact bytes the badge will receive — drag the quality
+ * slider and watch the artefacts appear.
+ *
+ * Adding/removing pictures lives in <image-list>; this element only edits what the
+ * store says is selected and writes view/quality back into that entry.
  *
  * Why no crop library: the output is a fixed square viewport, so "crop" here is only pan
  * and zoom with a cover clamp (image.ts::clampView). A crop-box UI would fight the round
  * preview and add ~40 KB for nothing we use.
- *
- * The `size` attribute ("368,368") comes from the badge's info report; until a badge is
- * connected we assume the DZBJ-TV07 default.
  */
 
-import {
-  DEFAULT_QUALITY,
-  IDENTITY_VIEW,
-  MAX_ZOOM,
-  clampView,
-  drawView,
-  formatBytes,
-  loadBitmap,
-  neededKb,
-  prepareImage,
-  type PreparedImage,
-  type View,
-} from "../image.js";
+import { IDENTITY_VIEW, MAX_ZOOM, clampView, drawView, formatBytes, neededKb, type View } from "../image.js";
+import type { ImageEntry, ImageStore } from "../model.js";
 
 const ENCODE_DEBOUNCE_MS = 120;
 
 export class ImagePicker extends HTMLElement {
   static observedAttributes = ["size"];
-  private bitmap: ImageBitmap | null = null;
-  private prepared: PreparedImage | null = null;
-  private quality = DEFAULT_QUALITY;
-  private view: View = { ...IDENTITY_VIEW };
+  private store: ImageStore | null = null;
+  private entry: ImageEntry | null = null;
   private encodeTimer = 0;
   private encodeSerial = 0; // discard results of encodes that were superseded mid-flight
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchStart: { dist: number; zoom: number } | null = null;
 
-  private input!: HTMLInputElement;
   private drop!: HTMLElement;
   private canvas!: HTMLCanvasElement;
   private slider!: HTMLInputElement;
   private zoomSlider!: HTMLInputElement;
   private readout!: HTMLElement;
-
-  get image(): PreparedImage | null {
-    return this.prepared;
-  }
 
   get size(): { width: number; height: number } {
     const [w, h] = (this.getAttribute("size") ?? "368,368").split(",").map(Number);
@@ -63,49 +45,25 @@ export class ImagePicker extends HTMLElement {
   connectedCallback(): void {
     this.innerHTML = `
       <div class="drop" tabindex="0" title="drag to pan, wheel or pinch to zoom, double-click to reset">
-        <input type="file" accept="image/*" hidden>
         <canvas class="preview" hidden></canvas>
-        <span class="hint">drop an image here or click to choose</span>
+        <span class="hint">add a picture to start</span>
       </div>
       <div class="controls">
         <label>zoom <input type="range" class="zoom" min="1" max="${MAX_ZOOM}" step="0.01" value="1" disabled></label>
         <button type="button" class="reset" disabled>reset</button>
-        <button type="button" class="choose">choose file…</button>
       </div>
       <div class="controls">
-        <label>quality <input type="range" class="quality" min="0.1" max="1" step="0.05" value="${DEFAULT_QUALITY}"> <output></output></label>
+        <label>quality <input type="range" class="quality" min="0.1" max="1" step="0.05" value="0.7" disabled> <output></output></label>
       </div>
       <div class="controls readout-row">
         <span class="readout" aria-live="polite"></span>
         <span class="encoded-tag" hidden>showing encoded JPEG</span>
       </div>`;
-    this.input = this.querySelector("input[type=file]")!;
     this.drop = this.querySelector(".drop")!;
     this.canvas = this.querySelector("canvas")!;
     this.slider = this.querySelector(".quality")!;
     this.zoomSlider = this.querySelector(".zoom")!;
     this.readout = this.querySelector(".readout")!;
-
-    // --- choosing a file: click (only while empty, so clicks don't fight panning), drop, paste
-    this.querySelector(".choose")!.addEventListener("click", () => this.input.click());
-    this.drop.addEventListener("click", () => {
-      if (!this.bitmap) this.input.click();
-    });
-    this.input.addEventListener("change", () => void this.setFile(this.input.files?.[0]));
-    this.drop.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      this.drop.classList.add("over");
-    });
-    this.drop.addEventListener("dragleave", () => this.drop.classList.remove("over"));
-    this.drop.addEventListener("drop", (e) => {
-      e.preventDefault();
-      this.drop.classList.remove("over");
-      void this.setFile(e.dataTransfer?.files[0]);
-    });
-    document.addEventListener("paste", (e) => {
-      const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith("image/"));
-      if (f) void this.setFile(f);
-    });
 
     // --- framing: pan by drag, zoom by wheel / pinch / slider, reset by double-click
     this.drop.addEventListener("pointerdown", this.onPointerDown);
@@ -119,11 +77,16 @@ export class ImagePicker extends HTMLElement {
 
     // --- quality
     this.slider.addEventListener("input", () => {
-      this.quality = Number(this.slider.value);
-      this.querySelector("output")!.textContent = this.quality.toFixed(2);
+      if (!this.entry) return;
+      this.entry.quality = Number(this.slider.value);
+      this.querySelector("output")!.textContent = this.entry.quality.toFixed(2);
       this.scheduleEncode();
     });
-    this.querySelector("output")!.textContent = this.quality.toFixed(2);
+  }
+
+  attach(store: ImageStore): void {
+    this.store = store;
+    store.on("select", (e) => this.show(e.detail));
   }
 
   attributeChangedCallback(_name: string, oldValue: string | null, newValue: string | null): void {
@@ -132,52 +95,71 @@ export class ImagePicker extends HTMLElement {
     // warrants a re-clamp + re-encode — anything else re-encoding here made the preview
     // churn every time some unrelated state was poked.
     if (!this.readout || oldValue === newValue) return;
-    if (this.bitmap) this.setView(this.view);
+    if (this.entry) this.setView(this.entry.view);
   }
 
-  // ------------------------------------------------------------------ file → bitmap
+  // ------------------------------------------------------------------ entry selection
 
-  private async setFile(file: File | undefined): Promise<void> {
-    if (!file) return;
-    this.bitmap = await loadBitmap(file);
-    this.canvas.hidden = false;
-    this.querySelector<HTMLElement>(".hint")!.hidden = true;
-    this.zoomSlider.disabled = false;
-    this.querySelector<HTMLButtonElement>(".reset")!.disabled = false;
-    this.drop.classList.add("loaded");
-    this.setView(IDENTITY_VIEW);
+  private show(entry: ImageEntry | null): void {
+    clearTimeout(this.encodeTimer);
+    this.encodeSerial++; // orphan any in-flight encode for the previous entry
+    this.entry = entry;
+    const has = !!entry;
+    this.canvas.hidden = !has;
+    this.querySelector<HTMLElement>(".hint")!.hidden = has;
+    this.zoomSlider.disabled = this.slider.disabled = !has;
+    this.querySelector<HTMLButtonElement>(".reset")!.disabled = !has;
+    this.drop.classList.toggle("loaded", has);
+    this.querySelector<HTMLElement>(".encoded-tag")!.hidden = true;
+    if (!entry) {
+      this.readout.textContent = "";
+      return;
+    }
+    this.slider.value = String(entry.quality);
+    this.querySelector("output")!.textContent = entry.quality.toFixed(2);
+    this.draw();
+    // If the entry already has an encode for this size, show it straight away.
+    if (entry.prepared && entry.prepared.width === this.size.width && entry.prepared.height === this.size.height) {
+      void this.paintEncoded(entry, this.encodeSerial);
+    } else {
+      this.scheduleEncode();
+    }
   }
 
   // ------------------------------------------------------------------ view handling
 
-  /** Clamp, redraw immediately, schedule the JPEG encode. Single entry point for all gestures. */
-  private setView(view: View): void {
-    if (!this.bitmap) return;
+  private draw(): void {
+    if (!this.entry) return;
     const { width, height } = this.size;
-    this.view = clampView(view, this.bitmap, width, height);
-    this.zoomSlider.value = String(this.view.zoom);
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width;
       this.canvas.height = height;
     }
-    drawView(this.canvas.getContext("2d")!, this.bitmap, width, height, this.view);
+    drawView(this.canvas.getContext("2d")!, this.entry.bitmap, width, height, this.entry.view);
+    this.zoomSlider.value = String(this.entry.view.zoom);
+  }
+
+  /** Clamp, redraw immediately, schedule the JPEG encode. Single entry point for all gestures. */
+  private setView(view: View): void {
+    if (!this.entry) return;
+    const { width, height } = this.size;
+    this.entry.view = clampView(view, this.entry.bitmap, width, height);
+    this.draw();
     this.querySelector<HTMLElement>(".encoded-tag")!.hidden = true; // live source until the encode lands
     this.scheduleEncode();
   }
 
   /** Zoom keeping the output point (px, py) — default centre — fixed under the cursor. */
   private zoomTo(zoom: number, px?: number, py?: number): void {
+    if (!this.entry) return;
     const { width, height } = this.size;
+    const v = this.entry.view;
     const cx = (px ?? width / 2) - width / 2;
     const cy = (py ?? height / 2) - height / 2;
-    const ratio = Math.min(MAX_ZOOM, Math.max(1, zoom)) / this.view.zoom;
+    const ratio = Math.min(MAX_ZOOM, Math.max(1, zoom)) / v.zoom;
     // The point under the cursor is at (c - d) in image-centred coords; scaling about the
     // centre moves it to ratio*(c - d); shift d so it lands back on c.
-    this.setView({
-      zoom: this.view.zoom * ratio,
-      dx: cx - ratio * (cx - this.view.dx),
-      dy: cy - ratio * (cy - this.view.dy),
-    });
+    this.setView({ zoom: v.zoom * ratio, dx: cx - ratio * (cx - v.dx), dy: cy - ratio * (cy - v.dy) });
   }
 
   /** Pointer position in output-canvas pixels (the canvas is CSS-scaled to fit). */
@@ -188,19 +170,19 @@ export class ImagePicker extends HTMLElement {
   }
 
   private onPointerDown = (e: PointerEvent): void => {
-    if (!this.bitmap) return;
+    if (!this.entry) return;
     this.drop.setPointerCapture(e.pointerId);
     this.pointers.set(e.pointerId, this.canvasPoint(e));
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
-      this.pinchStart = { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y), zoom: this.view.zoom };
+      this.pinchStart = { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y), zoom: this.entry.view.zoom };
     }
     this.drop.classList.add("grabbing");
   };
 
   private onPointerMove = (e: PointerEvent): void => {
     const prev = this.pointers.get(e.pointerId);
-    if (!prev || !this.bitmap) return;
+    if (!prev || !this.entry) return;
     const cur = this.canvasPoint(e);
     this.pointers.set(e.pointerId, cur);
     if (this.pointers.size === 2 && this.pinchStart) {
@@ -208,7 +190,8 @@ export class ImagePicker extends HTMLElement {
       const dist = Math.hypot(a!.x - b!.x, a!.y - b!.y);
       this.zoomTo(this.pinchStart.zoom * (dist / this.pinchStart.dist), (a!.x + b!.x) / 2, (a!.y + b!.y) / 2);
     } else if (this.pointers.size === 1) {
-      this.setView({ ...this.view, dx: this.view.dx + (cur.x - prev.x), dy: this.view.dy + (cur.y - prev.y) });
+      const v = this.entry.view;
+      this.setView({ ...v, dx: v.dx + (cur.x - prev.x), dy: v.dy + (cur.y - prev.y) });
     }
   };
 
@@ -219,11 +202,11 @@ export class ImagePicker extends HTMLElement {
   };
 
   private onWheel = (e: WheelEvent): void => {
-    if (!this.bitmap) return;
+    if (!this.entry) return;
     e.preventDefault();
     const p = this.canvasPoint(e);
     // ~10% per notch; trackpads deliver many small deltas, which this handles smoothly.
-    this.zoomTo(this.view.zoom * Math.exp(-e.deltaY * 0.0015), p.x, p.y);
+    this.zoomTo(this.entry.view.zoom * Math.exp(-e.deltaY * 0.0015), p.x, p.y);
   };
 
   // ------------------------------------------------------------------ encode + readout
@@ -234,32 +217,26 @@ export class ImagePicker extends HTMLElement {
   }
 
   private async encode(): Promise<void> {
-    if (!this.bitmap) return;
+    if (!this.entry || !this.store) return;
+    const entry = this.entry;
     const serial = ++this.encodeSerial;
     const { width, height } = this.size;
-    const prepared = await prepareImage(this.bitmap, width, height, this.quality, this.view);
-    // Decode what we just encoded and show *that*; if a newer gesture/encode started while
-    // we were busy, throw this one away so the preview never flashes a stale frame.
-    const decoded = await createImageBitmap(new Blob([new Uint8Array(prepared.jpeg)], { type: "image/jpeg" }));
-    if (serial !== this.encodeSerial) {
+    await this.store.encode(entry, width, height);
+    await this.paintEncoded(entry, serial);
+  }
+
+  /** Decode the entry's encoded JPEG and paint it; skipped if a newer encode/selection happened. */
+  private async paintEncoded(entry: ImageEntry, serial: number): Promise<void> {
+    if (!entry.prepared) return;
+    const decoded = await createImageBitmap(new Blob([new Uint8Array(entry.prepared.jpeg)], { type: "image/jpeg" }));
+    if (serial !== this.encodeSerial || entry !== this.entry) {
       decoded.close();
-      URL.revokeObjectURL(prepared.previewUrl);
       return;
     }
-    if (this.prepared) URL.revokeObjectURL(this.prepared.previewUrl);
-    this.prepared = prepared;
     this.canvas.getContext("2d")!.drawImage(decoded, 0, 0);
     decoded.close();
     this.querySelector<HTMLElement>(".encoded-tag")!.hidden = false;
-    this.updateReadout();
-    this.dispatchEvent(new CustomEvent("image", { detail: this.prepared, bubbles: true }));
-  }
-
-  /** Encoded size only; whether it fits the badge is the connection panel's business. */
-  private updateReadout(): void {
-    this.readout.textContent = this.prepared
-      ? `${formatBytes(this.prepared.jpeg.length)} JPEG, ${neededKb(this.prepared.jpeg.length)} KB on the badge`
-      : "";
+    this.readout.textContent = `${formatBytes(entry.prepared.jpeg.length)} JPEG, ${neededKb(entry.prepared.jpeg.length)} KB on the badge`;
   }
 }
 
