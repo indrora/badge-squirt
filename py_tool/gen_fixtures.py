@@ -31,27 +31,7 @@ sys.argv = ["dzbj"]          # dzbj.py builds an argparse parser only under __ma
 spec.loader.exec_module(dzbj)
 
 
-def framepack(jpegs: list[bytes], w: int, h: int, interval_ms: int) -> bytes:
-    """Reference multi-frame container from the protocol doc §3b (not yet in dzbj.py)."""
-    n = len(jpegs)
-    folder = f"output/{interval_ms}ms".encode()[:12].ljust(12, b"\0")
-    first = 32 + 16 * n
-    offs, body, cur = [], bytearray(), first
-    for j in jpegs:
-        offs.append(cur)
-        rec = struct.pack("<IIBBHHHIIII", cur, 0, 11, 0, 0, w, h, cur + 32, len(j), 0, 0) + j
-        rec += b"\0" * (-len(rec) % 4)
-        body += rec
-        cur += len(rec)
-    for i, o in enumerate(offs):
-        nxt = offs[i + 1] if i + 1 < n else first
-        struct.pack_into("<I", body, o - first + 4, nxt)
-    dirent = b"".join(
-        f"output/{interval_ms}ms/frame_{i + 1:06d}.jpg".encode()[:12].ljust(12, b"\0") + struct.pack("<I", o)
-        for i, o in enumerate(offs)
-    )
-    head = struct.pack("<IIII", 0x12345678, 16 * n + 24, n, interval_ms) + folder + struct.pack("<I", cur - 1)
-    return head + dirent + bytes(body)
+framepack = dzbj.framepack   # the real packer, now that dzbj.py has one
 
 
 def pattern(n: int, seed: int = 0) -> bytes:
@@ -77,7 +57,7 @@ fixtures = {
         "HEAD_APP_TO_DEVICE": dzbj.HEAD_APP_TO_DEVICE,
         "HEAD_DEVICE_TO_APP": dzbj.HEAD_DEVICE_TO_APP,
         "ALBUM_CHUNK": dzbj.ALBUM_CHUNK,
-        "DYNAMIC_CHUNK": 426,
+        "DYNAMIC_CHUNK": dzbj.DYNAMIC_CHUNK,
         "TYPE": dzbj.TYPE,
     },
     "packet": [

@@ -13,6 +13,8 @@ dzbj.py — minimal BLE client for the "DZBJ-" digital display badge (E-Goods ap
   uv run dzbj.py rawsend img.jpg --container imb --envelope --framing c0 --count 3
                                           # receive-mode format probing: see cmd_rawsend
   uv run dzbj.py add a.png b.jpg ...      # upload stills (ALBUM, type 6) on one connection
+  uv run dzbj.py slideshow a.jpg b.jpg    # upload a multi-frame stack (DYNAMIC_ATMOSPHERE, type 5)
+  uv run dzbj.py slideshow anim.gif       # ...or an animated GIF, frames + timing taken from it
   uv run dzbj.py remove NAME              # not in the known protocol — see probe
   uv run dzbj.py probe 7                  # send {"type":7} (VERSION_QUERY) and dump replies
   uv run dzbj.py probe 13 '{"devname":"x"}'  # send a JSON command with extra fields
@@ -60,6 +62,8 @@ TYPE = {
 }
 
 ALBUM_CHUNK = 496        # app uses 496 for stills (8B header + 496 + 1B checksum = 505 <= MTU 512)
+DYNAMIC_CHUNK = 426      # app uses a smaller chunk for the multi-frame container; unknown why, copied
+DEFAULT_INTERVAL_MS = 100  # app default "speed" 0.1 s per frame
 JPEG_QUALITY = 70        # app uses 100, which is ~3x the bytes for no visible gain on a 368px round panel
 PACKET_GAP_S = 0.08      # app sleeps 80 ms between packets (10 ms if device time_mode == 1)
 
@@ -88,6 +92,40 @@ def imb_container(jpeg: bytes, w: int, h: int) -> bytes:
     return hdr + jpeg
 
 
+def framepack(jpegs: list[bytes], w: int, h: int, interval_ms: int) -> bytes:
+    """
+    Multi-frame container for DYNAMIC_ATMOSPHERE (protocol doc §3b), used by the app for
+    slideshow / marquee / video. Recovered from uni_modules/utils/gifAgreement.js.
+
+      header (32 B):  magic 0x12345678 | 16n+24 | n | interval_ms | "output/<ms>ms" [12] | totalLen-1
+      directory:      n × ( name[12] | u32 offset of that frame's record )
+      records:        each 4-byte aligned: own offset | next offset (last -> first, so the
+                      firmware loops) | 11 (JPEG) | 0 | u16 0 | w | h | offset of JPEG data |
+                      jpeg len | 0 | 0 | JPEG bytes | pad
+
+    The 12-char names truncate "output/100ms/frame_000001.jpg" to "output/100m" and the
+    firmware demonstrably doesn't care; it walks the linked list, not the names.
+    """
+    n = len(jpegs)
+    folder = f"output/{interval_ms}ms".encode()[:12].ljust(12, b"\0")
+    first = 32 + 16 * n
+    offs, body, cur = [], bytearray(), first
+    for j in jpegs:
+        offs.append(cur)
+        rec = struct.pack("<IIBBHHHIIII", cur, 0, 11, 0, 0, w, h, cur + 32, len(j), 0, 0) + j
+        rec += b"\0" * (-len(rec) % 4)
+        body += rec
+        cur += len(rec)
+    for i, o in enumerate(offs):                      # patch "next" pointers
+        struct.pack_into("<I", body, o - first + 4, offs[i + 1] if i + 1 < n else first)
+    dirent = b"".join(
+        f"output/{interval_ms}ms/frame_{i + 1:06d}.jpg".encode()[:12].ljust(12, b"\0") + struct.pack("<I", o)
+        for i, o in enumerate(offs)
+    )
+    head = struct.pack("<IIII", 0x12345678, 16 * n + 24, n, interval_ms) + folder + struct.pack("<I", cur - 1)
+    return head + dirent + bytes(body)
+
+
 def parse_notification(data: bytes) -> tuple[bytes, str]:
     """Return (raw 5-byte header, text). The app strips 5 header bytes + 1 trailing checksum."""
     if len(data) < 6:
@@ -97,13 +135,36 @@ def parse_notification(data: bytes) -> tuple[bytes, str]:
 
 # ----------------------------------------------------------------------------- image prep
 
-def prepare_jpeg(path: str, w: int, h: int, quality: int = 100) -> bytes:
-    im = Image.open(path)
-    im = im.convert("RGB")
-    im = im.resize((w, h), Image.LANCZOS)   # app resizes to the device-reported size
+def encode_jpeg(im: Image.Image, w: int, h: int, quality: int) -> bytes:
+    im = im.convert("RGB").resize((w, h), Image.LANCZOS)   # app resizes to the device-reported size
     buf = io.BytesIO()
     im.save(buf, format="JPEG", quality=quality, optimize=False, progressive=False, subsampling=0)
     return buf.getvalue()
+
+
+def prepare_jpeg(path: str, w: int, h: int, quality: int = 100) -> bytes:
+    return encode_jpeg(Image.open(path), w, h, quality)
+
+
+def prepare_frames(paths: list[str], w: int, h: int, quality: int) -> tuple[list[bytes], int | None]:
+    """
+    Expand the inputs into JPEG frames. Animated files (GIF/APNG/WebP) contribute every
+    frame and their per-frame duration; stills contribute one frame. Returns the frames
+    and the median duration found in animated inputs (None if there were none) so the
+    caller can default --interval sensibly.
+    """
+    from PIL import ImageSequence
+    frames, durations = [], []
+    for path in paths:
+        im = Image.open(path)
+        if getattr(im, "is_animated", False):
+            for fr in ImageSequence.Iterator(im):
+                durations.append(int(fr.info.get("duration", 0)) or DEFAULT_INTERVAL_MS)
+                frames.append(encode_jpeg(fr.copy(), w, h, quality))
+        else:
+            frames.append(encode_jpeg(im, w, h, quality))
+    interval = sorted(durations)[len(durations) // 2] if durations else None
+    return frames, interval
 
 
 # ----------------------------------------------------------------------------- BLE session
@@ -445,6 +506,30 @@ async def cmd_add(args):
         console.print(f"[green]done[/]: {len(args.image)} image(s) uploaded")
 
 
+async def cmd_slideshow(args):
+    """
+    Upload a stack of frames as DYNAMIC_ATMOSPHERE (type 5): the badge cycles them at
+    --interval ms. Inputs are stills and/or animated GIFs; a GIF's own frame timing is
+    used unless --interval is given. Same envelope/fragment scheme as `add`, but the blob
+    is the frame-pack container and the chunk is 426 (matching the app).
+    """
+    async with Badge(verbose=args.verbose) as b:
+        w, h = b.size
+        gap = args.gap if args.gap is not None else (0.01 if (b.info or {}).get("time_mode") == 1 else PACKET_GAP_S)
+        free = (b.info or {}).get("freespace")
+        frames, gif_interval = prepare_frames(args.image, w, h, args.quality)
+        interval = args.interval or gif_interval or DEFAULT_INTERVAL_MS
+        blob = framepack(frames, w, h, interval)
+        need_kb = math.ceil(len(blob) / 1024)
+        console.print(f"{len(frames)} frame(s) at {interval} ms, {sum(map(len, frames)):,} B of JPEG, "
+                      f"container {len(blob):,} B (~{need_kb} KB), device free {free} KB")
+        if isinstance(free, int) and need_kb > free and not args.force:
+            sys.exit("not enough free space on device (use --force to send anyway)")
+        pkts = fragment_image(TYPE["DYNAMIC_ATMOSPHERE"], blob, args.chunk)
+        await b.send_packets(pkts, gap, label="slideshow")
+        console.print(f"[green]done[/]: {len(frames)} frames uploaded")
+
+
 async def cmd_rawsend(args):
     """
     Format probe for the badge's double-tap "waiting to receive" mode.
@@ -563,6 +648,15 @@ def main():
     p.add_argument("--no-wait", action="store_true", help="don't wait for the info report (badge in receive mode)")
     p.add_argument("--listen-all", action="store_true", help="also subscribe to every other notify characteristic")
     p.set_defaults(fn=cmd_add)
+
+    p = sub.add_parser("slideshow", aliases=["album"], help="upload a multi-frame stack (DYNAMIC_ATMOSPHERE)")
+    p.add_argument("image", nargs="+", help="stills and/or animated GIFs, in display order")
+    p.add_argument("--interval", type=int, default=None, help=f"ms per frame (default: GIF timing, else {DEFAULT_INTERVAL_MS})")
+    p.add_argument("--quality", "-q", type=int, default=JPEG_QUALITY)
+    p.add_argument("--chunk", type=int, default=DYNAMIC_CHUNK, help="payload bytes per packet (app: 426)")
+    p.add_argument("--force", action="store_true", help="skip the free-space check")
+    p.add_argument("--gap", type=float, default=None)
+    p.set_defaults(fn=cmd_slideshow)
 
     p = sub.add_parser("rawsend", help="receive-mode format probe (see docstring)")
     p.add_argument("image", nargs="?", default="sniffit.jpg")
