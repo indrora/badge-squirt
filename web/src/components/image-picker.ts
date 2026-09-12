@@ -3,9 +3,11 @@
  *
  * The round preview is a live canvas at the badge's native size. The user frames the
  * shot directly on it: drag to pan, wheel / pinch / slider to zoom, double-click to
- * reset. Every gesture redraws the canvas synchronously (cheap at 368 px) and re-encodes
- * the JPEG on a short debounce, then emits "image" (detail: PreparedImage) so the
- * uploader always holds exactly the bytes shown.
+ * reset. Every gesture redraws the canvas synchronously from the lossless source (cheap
+ * at 368 px) and re-encodes the JPEG on a short debounce. Once the encode lands, the
+ * *encoded* JPEG is decoded and painted back over the preview, so at rest you are looking
+ * at the exact bytes the badge will receive — drag the quality slider and watch the
+ * artefacts appear. "image" (detail: PreparedImage) is emitted at the same moment.
  *
  * Why no crop library: the output is a fixed square viewport, so "crop" here is only pan
  * and zoom with a cover clamp (image.ts::clampView). A crop-box UI would fight the round
@@ -38,6 +40,7 @@ export class ImagePicker extends HTMLElement {
   private quality = DEFAULT_QUALITY;
   private view: View = { ...IDENTITY_VIEW };
   private encodeTimer = 0;
+  private encodeSerial = 0; // discard results of encodes that were superseded mid-flight
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchStart: { dist: number; zoom: number } | null = null;
 
@@ -70,8 +73,9 @@ export class ImagePicker extends HTMLElement {
         <button type="button" class="choose">choose file…</button>
       </div>
       <div class="controls">
-        <label>quality <input type="range" class="quality" min="0.3" max="1" step="0.05" value="${DEFAULT_QUALITY}"> <output></output></label>
+        <label>quality <input type="range" class="quality" min="0.1" max="1" step="0.05" value="${DEFAULT_QUALITY}"> <output></output></label>
         <span class="readout" aria-live="polite"></span>
+        <span class="encoded-tag" hidden>showing encoded JPEG</span>
       </div>`;
     this.input = this.querySelector("input[type=file]")!;
     this.drop = this.querySelector(".drop")!;
@@ -154,6 +158,7 @@ export class ImagePicker extends HTMLElement {
       this.canvas.height = height;
     }
     drawView(this.canvas.getContext("2d")!, this.bitmap, width, height, this.view);
+    this.querySelector<HTMLElement>(".encoded-tag")!.hidden = true; // live source until the encode lands
     this.scheduleEncode();
   }
 
@@ -227,9 +232,22 @@ export class ImagePicker extends HTMLElement {
 
   private async encode(): Promise<void> {
     if (!this.bitmap) return;
+    const serial = ++this.encodeSerial;
     const { width, height } = this.size;
+    const prepared = await prepareImage(this.bitmap, width, height, this.quality, this.view);
+    // Decode what we just encoded and show *that*; if a newer gesture/encode started while
+    // we were busy, throw this one away so the preview never flashes a stale frame.
+    const decoded = await createImageBitmap(new Blob([new Uint8Array(prepared.jpeg)], { type: "image/jpeg" }));
+    if (serial !== this.encodeSerial) {
+      decoded.close();
+      URL.revokeObjectURL(prepared.previewUrl);
+      return;
+    }
     if (this.prepared) URL.revokeObjectURL(this.prepared.previewUrl);
-    this.prepared = await prepareImage(this.bitmap, width, height, this.quality, this.view);
+    this.prepared = prepared;
+    this.canvas.getContext("2d")!.drawImage(decoded, 0, 0);
+    decoded.close();
+    this.querySelector<HTMLElement>(".encoded-tag")!.hidden = false;
     this.updateReadout();
     this.dispatchEvent(new CustomEvent("image", { detail: this.prepared, bubbles: true }));
   }
