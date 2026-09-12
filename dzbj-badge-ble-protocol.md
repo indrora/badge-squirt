@@ -13,9 +13,26 @@ logic is JS; the DEX is just the DCloud runtime). Relevant modules inside the bu
 | Service | `000001C0-0000-1000-8000-00805F9B34FB` |
 | Write char | `000001C1-…` (falls back to first char with `write` property) |
 | Notify char | `000001C2-…` (falls back to first char with `notify` property) |
+| **Observed hardware** | `DZBJ-TV07(BLE)` has **no** 01C0 service. It exposes two vendor services (full table below). Notify works on `AE3C`; `AE02` advertises `notify` but rejects its CCCD write with "handle is invalid". Write goes to the sibling `AE3B` (`write-without-response` only). Any client MUST resolve by property, not by UUID. |
+
+GATT table of DZBJ-TV07(BLE), dumped 2026-09-12 with `dzbj.py dump`:
+
+```
+service 0000ae30  Vendor specific  (Jieli SPP-over-BLE profile)
+  char ae01  handle=5   write-without-response
+  char ae02  handle=7   notify        (CCCD 2902 @9; CCCD write fails: handle is invalid)
+  char ae03  handle=10  write-without-response
+  char ae04  handle=12  notify        (CCCD @14)
+  char ae05  handle=15  indicate      (CCCD @17)
+  char ae10  handle=18  write,read
+service 0000ae3a  Vendor specific
+  char ae3b  handle=65  write-without-response
+  char ae3c  handle=67  notify        (CCCD @69) <- info report (type 13) arrives here
+```
 | MTU | requests 512 (Android/HarmonyOS; 3 s after connect) |
 | Write type | `writeNoResponse` on Android, `write` on iOS |
 | Pacing | app sleeps 80 ms between packets (10 ms if device reports `time_mode == 1`) |
+| **Flow control (critical)** | The badge's write char is write-without-response only. The host MUST wait for the stack's "ready to send without response" signal before each write (CoreBluetooth `canSendWriteWithoutResponse`; Web Bluetooth `writeValueWithoutResponse` in Chrome should do this internally). Without it, packets are dropped silently, the badge shows "Updating..." and never renders. Verified 2026-09-12: 270 packets / 133 KB JPEG rendered fine once bleak was made to poll the ready flag. Ack `{GetPacketSuccess}` frames were **never** observed on AE3C; do not wait for them. |
 
 Connect sequence: connect → wait 3 s → set MTU 512 → wait 1 s → discover chars →
 enable notify on 01C2 → device unsolicitedly pushes its info JSON (type 13). The app
@@ -127,9 +144,18 @@ Frame records, starting at 32 + 16*n, each 4-byte aligned:
 ## 4. Device → app (header 0xA0, notify on 01C2)
 
 The app hex-encodes the notification, drops the first **10 hex chars (5 bytes)** and the
-last 2 (checksum byte), and ASCII-decodes the rest. So device frames have a 5-byte
-header (0xA0, type, and probably a 16-bit length + one more byte — the JS never
-parses it, so the exact layout is unverified) + text + checksum.
+last 2 (checksum byte), and ASCII-decodes the rest.
+
+Verified on DZBJ-TV07 (2026-09-12), info frame `a0 0d 00 00 8a <138 bytes JSON> d0`:
+
+```
++0  u8   0xA0        HEAD_DEVICE_TO_APP
++1  u8   type        (0x0D = 13 for the info report)
++2  u8   0x00        unknown (fragment count?)
++3  u16  bodyLen     big-endian (0x008A = 138) — could also be u8 pad + u8 len; only one sample
++5  ...  ASCII/JSON body
++N  u8   checksum    same rule as app→device: whole frame sums to 0 mod 256
+```
 
 Text bodies seen:
 
@@ -139,6 +165,11 @@ Text bodies seen:
   ```json
   {"type":13, "size":"368,368", "freespace":8192, "time_mode":0, "ADD":"<device id>"}
   ```
+  Real sample from DZBJ-TV07 (fields the app ignores included):
+  ```json
+  {"type":13,"allspace":16384,"freespace":5500,"devname":"","size":"368,368","screen":"0","ADD":"79,3F,75,2B,7F,E6","time_mode":1,"brand":0}
+  ```
+  `allspace` is total KB, `ADD` is the BD address, `time_mode` was **1** on this unit (10 ms pacing).
   `size` sets the resize target for all images, `freespace` is KB, `time_mode==1`
   switches pacing to 10 ms, `ADD` is the device identifier.
 

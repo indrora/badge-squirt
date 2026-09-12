@@ -94,7 +94,8 @@ def prepare_jpeg(path: str, w: int, h: int, quality: int = 100) -> bytes:
 # ----------------------------------------------------------------------------- BLE session
 
 class Badge:
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, subscribe: bool = True):
+        self.subscribe = subscribe
         self.client: BleakClient | None = None
         # Resolved at connect time (see _resolve_chars); never assume the UUIDs above exist.
         self.write_char = None
@@ -118,8 +119,10 @@ class Badge:
         except Exception:
             mtu = None
         print(f"connected, mtu={mtu}", file=sys.stderr)
+        if not self.subscribe:
+            return self
         self._resolve_chars()
-        await self.client.start_notify(self.notify_char, self._on_notify)
+        await self._subscribe()
         # device pushes its info JSON shortly after notify is enabled
         for _ in range(40):
             if self.info:
@@ -130,7 +133,8 @@ class Badge:
     async def __aexit__(self, *exc):
         if self.client and self.client.is_connected:
             try:
-                await self.client.stop_notify(self.notify_char)
+                if self.notify_char is not None:
+                    await self.client.stop_notify(self.notify_char)
             except Exception:
                 pass
             await self.client.disconnect()
@@ -162,13 +166,64 @@ class Badge:
             return None
 
         self.write_char = find(UUID_WRITE, ("write", "write-without-response"))
-        self.notify_char = find(UUID_NOTIFY, ("notify", "indicate"))
-        if self.write_char is None or self.notify_char is None:
+        # Every notify/indicate-capable characteristic, canonical UUID first, in GATT order.
+        # Seen in the wild: "DZBJ-TV07(BLE)" has no 01C0 service at all. It exposes two vendor
+        # services: AE30 (Jieli SPP-style: AE01 w/o-rsp, AE02 notify, AE03/AE04, AE05 indicate,
+        # AE10 r/w) and AE3A (AE3B w/o-rsp, AE3C notify). AE02 rejects its CCCD write with
+        # "handle is invalid"; AE3C accepts and the info report arrives on it. The write
+        # characteristic is re-selected in _subscribe() to live in the same service as the
+        # notify one, so we don't end up talking on AE01 while listening on AE3C.
+        self.notify_candidates = [ch for sv in target for ch in sv.characteristics
+                                  if "notify" in ch.properties or "indicate" in ch.properties]
+        self.notify_candidates.sort(key=lambda ch: ch.uuid.lower() != UUID_NOTIFY)
+        if self.write_char is None or not self.notify_candidates:
             print(self.gatt_dump(), file=sys.stderr)
             sys.exit(f"could not resolve write/notify characteristics "
-                     f"(write={self.write_char}, notify={self.notify_char}); GATT table above")
-        print(f"write char  {self.write_char.uuid} {self.write_char.properties}", file=sys.stderr)
-        print(f"notify char {self.notify_char.uuid} {self.notify_char.properties}", file=sys.stderr)
+                     f"(write={self.write_char}, notify candidates={self.notify_candidates}); GATT table above")
+        # CoreBluetooth can't set MTU; respect what the characteristic actually supports.
+        self.write_response = "write" in self.write_char.properties
+
+    async def _subscribe(self):
+        """
+        Enable notifications on the first candidate that accepts a CCCD write.
+
+        macOS caches each peripheral's GATT database. If the badge's firmware changed its
+        table since the last pairing, the cached handles are wrong and CoreBluetooth answers
+        the CCCD write with CBATTErrorDomain code 1 "The handle is invalid". Nothing in
+        userland can flush that cache: toggle Bluetooth off/on in Control Center (or
+        `sudo pkill bluetoothd`) and reconnect. We surface that hint instead of a traceback.
+        """
+        errors = []
+        for ch in self.notify_candidates:
+            try:
+                await self.client.start_notify(ch, self._on_notify)
+                self.notify_char = ch
+                # Prefer a write characteristic from the same service as the working notify one.
+                sibling = next((c for c in self.client.services.get_service(ch.service_handle).characteristics
+                                if "write" in c.properties or "write-without-response" in c.properties), None)
+                if sibling is not None:
+                    self.write_char = sibling
+                    self.write_response = "write" in sibling.properties
+                print(f"notify char {ch.uuid} {ch.properties}", file=sys.stderr)
+                print(f"write char  {self.write_char.uuid} {self.write_char.properties} "
+                      f"(response={self.write_response})", file=sys.stderr)
+                # Best effort: also listen on every other notify char (AE02/AE04/AE05) so we
+                # can see which one the per-packet acks come out of. Failures are fine.
+                for extra in self.notify_candidates:
+                    if extra is ch:
+                        continue
+                    try:
+                        await self.client.start_notify(extra, self._on_notify)
+                        print(f"also listening on {extra.uuid}", file=sys.stderr)
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"  (no notify on {extra.uuid}: {exc})", file=sys.stderr)
+                return
+            except Exception as exc:  # noqa: BLE001 — bleak raises its own hierarchy
+                errors.append(f"  {ch.uuid} handle={ch.handle}: {exc}")
+        print(self.gatt_dump(), file=sys.stderr)
+        sys.exit("could not enable notifications on any characteristic:\n" + "\n".join(errors)
+                 + "\nIf the error is 'The handle is invalid', macOS has a stale GATT cache for this"
+                 " badge: toggle Bluetooth off and on (or `sudo pkill bluetoothd`) and retry.")
 
     def gatt_dump(self) -> str:
         lines = []
@@ -185,7 +240,7 @@ class Badge:
         self.log.append((time.time(), data))
         hdr, text = parse_notification(data)
         if self.verbose:
-            print(f"<- {data.hex()}  hdr={hdr.hex()} text={text!r}", file=sys.stderr)
+            print(f"<- [{_sender.uuid[4:8]}] {data.hex()}  hdr={hdr.hex()} text={text!r}", file=sys.stderr)
         if text == "{GetPacketSuccess}":
             return
         if text == "{GetPacketFail}":
@@ -207,9 +262,25 @@ class Badge:
             return 368, 368
 
     async def write(self, pkt: bytes):
-        # app: writeNoResponse on Android, write-with-response on iOS. Response=True is the
-        # safe choice on macOS/CoreBluetooth where MTU can't be set explicitly.
-        await self.client.write_gatt_char(self.write_char, pkt, response=True)
+        """
+        Write one packet, honouring CoreBluetooth's write-without-response flow control.
+
+        The badge's write characteristic only supports write-without-response. bleak's
+        CoreBluetooth backend hands those straight to CBPeripheral.writeValue without checking
+        `canSendWriteWithoutResponse`; when the OS-side queue is full the write is *silently
+        dropped*. At the app's 10 ms pacing with 505-byte packets (3 LL PDUs each) that queue
+        overflows almost immediately, the badge sees a stream with holes, shows "Updating..."
+        and then never renders. So on macOS we poll the ready flag before every write. Other
+        backends (BlueZ/WinRT) apply back-pressure themselves; the hasattr guard skips them.
+        """
+        if not self.write_response:
+            periph = getattr(getattr(self.client, "_backend", None), "_peripheral", None)
+            if periph is not None and hasattr(periph, "canSendWriteWithoutResponse"):
+                for _ in range(500):            # 5 s worst case, then write anyway
+                    if periph.canSendWriteWithoutResponse():
+                        break
+                    await asyncio.sleep(0.01)
+        await self.client.write_gatt_char(self.write_char, pkt, response=self.write_response)
 
     async def send_packets(self, pkts: list[bytes], gap: float):
         self.failed.clear()
@@ -228,7 +299,7 @@ class Badge:
 # ----------------------------------------------------------------------------- commands
 
 async def cmd_dump(args):
-    async with Badge(verbose=args.verbose) as b:
+    async with Badge(verbose=args.verbose, subscribe=False) as b:
         print(b.gatt_dump())
 
 
@@ -252,7 +323,7 @@ async def cmd_add(args):
         print(f"jpeg {len(jpeg)} B, container {len(blob)} B (~{need_kb} KB), device free {free} KB", file=sys.stderr)
         if isinstance(free, int) and need_kb > free and not args.force:
             sys.exit("not enough free space on device (use --force to send anyway)")
-        gap = 0.01 if (b.info or {}).get("time_mode") == 1 else PACKET_GAP_S
+        gap = args.gap if args.gap is not None else (0.01 if (b.info or {}).get("time_mode") == 1 else PACKET_GAP_S)
         pkts = fragment_image(TYPE["ALBUM"], blob, args.chunk)
         await b.send_packets(pkts, gap)
         print("upload finished")
@@ -298,6 +369,7 @@ def main():
     p.add_argument("--quality", type=int, default=100, help="JPEG quality (app uses 100)")
     p.add_argument("--chunk", type=int, default=ALBUM_CHUNK, help="payload bytes per packet (app: 496)")
     p.add_argument("--force", action="store_true", help="skip the free-space check")
+    p.add_argument("--gap", type=float, default=None, help="seconds between packets (default: 0.01 if time_mode==1 else 0.08)")
     p.set_defaults(fn=cmd_add)
 
     p = sub.add_parser("remove", help="(not available in the known protocol)")
