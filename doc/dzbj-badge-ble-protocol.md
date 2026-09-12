@@ -33,6 +33,7 @@ service 0000ae3a  Vendor specific
 | Write type | `writeNoResponse` on Android, `write` on iOS |
 | Pacing | app sleeps 80 ms between packets (10 ms if device reports `time_mode == 1`) |
 | **Flow control (critical)** | The badge's write char is write-without-response only. The host MUST wait for the stack's "ready to send without response" signal before each write (CoreBluetooth `canSendWriteWithoutResponse`; Web Bluetooth `writeValueWithoutResponse` in Chrome should do this internally). Without it, packets are dropped silently, the badge shows "Updating..." and never renders. Verified 2026-09-12: 270 packets / 133 KB JPEG rendered fine once bleak was made to poll the ready flag. Ack `{GetPacketSuccess}` frames were **never** observed on AE3C; do not wait for them. |
+| **Web Bluetooth** | Verified 2026-09-12 in Chrome on macOS: `web/` connects via `namePrefix "DZB"` / service AF30, resolves AE3B/AE3C by property, and `writeValueWithoutResponse` at 10 ms pacing renders a still. Chrome's own back-pressure suffices; no extra flow control needed. |
 
 Connect sequence: connect → wait 3 s → set MTU 512 → wait 1 s → discover chars →
 enable notify on 01C2 → device unsolicitedly pushes its info JSON (type 13). The app

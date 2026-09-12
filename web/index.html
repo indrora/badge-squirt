@@ -31,7 +31,10 @@
     .drop { display: grid; place-items: center; width: 368px; height: 368px; max-width: 100%; aspect-ratio: 1;
             margin: 0 auto; border-radius: 50%; border: 2px dashed var(--line); overflow: hidden; cursor: pointer; background: #000; }
     .drop.over { border-color: var(--accent); }
-    .drop .preview { width: 100%; height: 100%; object-fit: cover; }
+    .drop.loaded { cursor: grab; touch-action: none; user-select: none; }
+    .drop.grabbing { cursor: grabbing; }
+    .drop .preview { width: 100%; height: 100%; display: block; }
+    button.reset, button.choose { padding: .3rem .7rem; font-size: .9rem; }
     .drop .hint { color: var(--muted); text-align: center; padding: 1rem; }
     .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; justify-content: center; }
     input[type=range] { width: 160px; vertical-align: middle; }
