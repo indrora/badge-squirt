@@ -50,3 +50,10 @@ upload.addEventListener("uploaded", () => {
     connect.setImageKb(neededKb(picker.image.jpeg.length));
   }
 });
+
+// The Pages workflow drops the release tag into VERSION next to index.html; locally there
+// is no such file and the footer just stays blank.
+fetch("VERSION")
+  .then((r) => (r.ok ? r.text() : ""))
+  .then((v) => (document.querySelector(".version")!.textContent = v.trim()))
+  .catch(() => undefined);

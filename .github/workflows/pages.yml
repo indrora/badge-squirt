@@ -1,0 +1,71 @@
+# Deploy web/ to GitHub Pages whenever a release tag is pushed.
+#
+# Tag scheme: release-YYYY.n  (e.g. release-2026.1). Only tags matching that pattern
+# deploy; ordinary pushes to main run the tests but never touch the live site, so the
+# published uploader only changes when someone deliberately cuts a release.
+#
+# Why Pages: Web Bluetooth requires a secure context, and github.io is https for free.
+# The app is bundler-free — tsc emits ES modules that index.html loads with relative
+# paths — so "build" is just compiling and copying index.html + dist/src into a folder.
+# dist/test is left out; node:test files have no business on the site.
+#
+# Pages must be served from GitHub Actions (Settings → Pages → Source). configure-pages
+# with `enablement: true` flips that switch on first run so no clicking is required.
+
+name: pages
+
+on:
+  push:
+    tags: ["release-*"]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Assemble site
+        run: |
+          mkdir -p ../site/dist
+          cp index.html ../site/
+          cp -R dist/src ../site/dist/src
+          # Tag name (or branch) shown in the footer via a tiny generated file the page can fetch.
+          echo "${GITHUB_REF_NAME}" > ../site/VERSION
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    # Only release tags go live; main just proves it still builds and tests.
+    if: startsWith(github.ref, 'refs/tags/release-')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - id: deployment
+        uses: actions/deploy-pages@v4
