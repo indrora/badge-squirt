@@ -34,7 +34,7 @@ import {
 const ENCODE_DEBOUNCE_MS = 120;
 
 export class ImagePicker extends HTMLElement {
-  static observedAttributes = ["size", "free"];
+  static observedAttributes = ["size"];
   private bitmap: ImageBitmap | null = null;
   private prepared: PreparedImage | null = null;
   private quality = DEFAULT_QUALITY;
@@ -74,6 +74,8 @@ export class ImagePicker extends HTMLElement {
       </div>
       <div class="controls">
         <label>quality <input type="range" class="quality" min="0.1" max="1" step="0.05" value="${DEFAULT_QUALITY}"> <output></output></label>
+      </div>
+      <div class="controls readout-row">
         <span class="readout" aria-live="polite"></span>
         <span class="encoded-tag" hidden>showing encoded JPEG</span>
       </div>`;
@@ -124,12 +126,13 @@ export class ImagePicker extends HTMLElement {
     this.querySelector("output")!.textContent = this.quality.toFixed(2);
   }
 
-  attributeChangedCallback(): void {
+  attributeChangedCallback(_name: string, oldValue: string | null, newValue: string | null): void {
     // Fires for attributes present in the HTML *before* connectedCallback has built the
-    // markup; nothing to update yet in that case.
-    if (!this.readout) return;
-    if (this.bitmap) this.setView(this.view); // size change → re-clamp, redraw, re-encode
-    else this.updateReadout();
+    // markup; nothing to update yet in that case. Only a real change of the badge's size
+    // warrants a re-clamp + re-encode — anything else re-encoding here made the preview
+    // churn every time some unrelated state was poked.
+    if (!this.readout || oldValue === newValue) return;
+    if (this.bitmap) this.setView(this.view);
   }
 
   // ------------------------------------------------------------------ file → bitmap
@@ -252,16 +255,11 @@ export class ImagePicker extends HTMLElement {
     this.dispatchEvent(new CustomEvent("image", { detail: this.prepared, bubbles: true }));
   }
 
+  /** Encoded size only; whether it fits the badge is the connection panel's business. */
   private updateReadout(): void {
-    if (!this.prepared) {
-      this.readout.textContent = "";
-      return;
-    }
-    const free = Number(this.getAttribute("free"));
-    const need = neededKb(this.prepared.jpeg.length);
-    const fits = !free || need <= free;
-    this.readout.textContent = `${formatBytes(this.prepared.jpeg.length)} → ${need} KB${free ? ` of ${free} KB free` : ""}`;
-    this.readout.classList.toggle("bad", !fits);
+    this.readout.textContent = this.prepared
+      ? `${formatBytes(this.prepared.jpeg.length)} JPEG, ${neededKb(this.prepared.jpeg.length)} KB on the badge`
+      : "";
   }
 }
 

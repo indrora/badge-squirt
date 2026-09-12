@@ -11,6 +11,7 @@ import type { DeviceInfo } from "../protocol/packet.js";
 
 export class BadgeConnect extends HTMLElement {
   private badge: Badge | null = null;
+  private imageKb = 0;
   private button!: HTMLButtonElement;
   private status!: HTMLElement;
   private infoEl!: HTMLElement;
@@ -36,6 +37,22 @@ export class BadgeConnect extends HTMLElement {
     this.badge = badge;
     badge.on("info", (e) => this.showInfo(e.detail));
     badge.on("disconnected", () => this.setState(false));
+  }
+
+  /** Size of the current encoded image in badge-KB; drives the "fits" status in the Free row. */
+  setImageKb(kb: number): void {
+    this.imageKb = kb;
+    this.updateFree();
+  }
+
+  private updateFree(): void {
+    const info = this.badge?.info;
+    const cell = this.querySelector<HTMLElement>('[data-f="free"]');
+    if (!info || !cell) return;
+    const fits = this.imageKb <= info.freespace;
+    const status = this.imageKb ? (fits ? ` — image needs ${this.imageKb} KB, fits` : ` — image needs ${this.imageKb} KB, DOES NOT FIT`) : "";
+    cell.textContent = `${info.freespace} KB${info.allspace ? ` of ${info.allspace} KB` : ""}${status}`;
+    cell.classList.toggle("bad", this.imageKb > 0 && !fits);
   }
 
   private async toggle(): Promise<void> {
@@ -69,7 +86,7 @@ export class BadgeConnect extends HTMLElement {
     const set = (f: string, v: string) => (this.querySelector<HTMLElement>(`[data-f="${f}"]`)!.textContent = v);
     set("name", this.badge?.name ?? "");
     set("size", info.size.replace(",", "×"));
-    set("free", `${info.freespace} KB${info.allspace ? ` of ${info.allspace} KB` : ""}`);
+    this.updateFree();
     set("gap", `${info.time_mode === 1 ? 10 : 80} ms (time_mode ${info.time_mode})`);
     set("add", info.ADD);
     this.infoEl.hidden = false;

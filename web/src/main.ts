@@ -13,7 +13,7 @@ import type { BadgeConnect } from "./components/badge-connect.js";
 import type { ImagePicker } from "./components/image-picker.js";
 import type { UploadProgress } from "./components/upload-progress.js";
 import type { DebugLog } from "./components/debug-log.js";
-import type { PreparedImage } from "./image.js";
+import { neededKb, type PreparedImage } from "./image.js";
 
 const badge = new Badge();
 
@@ -31,20 +31,22 @@ if (!Badge.supported) {
   document.querySelector(".unsupported")!.removeAttribute("hidden");
 }
 
-// The badge's reported size drives the canvas; free space drives the readout colour.
-badge.on("info", (e) => {
-  picker.setAttribute("size", e.detail.size);
-  picker.setAttribute("free", String(e.detail.freespace));
-});
-badge.on("disconnected", () => picker.removeAttribute("free"));
+// The badge's reported size drives the canvas. Free space is deliberately NOT pushed into
+// the picker: it changes after every upload, and any attribute change there used to
+// trigger a re-encode and a layout shift. The connection panel owns that status.
+badge.on("info", (e) => picker.setAttribute("size", e.detail.size));
 
-picker.addEventListener("image", (e) => upload.setImage((e as CustomEvent<PreparedImage>).detail));
+picker.addEventListener("image", (e) => {
+  const img = (e as CustomEvent<PreparedImage>).detail;
+  upload.setImage(img);
+  connect.setImageKb(neededKb(img.jpeg.length));
+});
 connect.addEventListener("connection", () => upload.refresh());
 
 // After a send the badge has ~this much less free space; it never re-reports.
 upload.addEventListener("uploaded", () => {
   if (badge.info && picker.image) {
-    badge.info.freespace -= Math.ceil((picker.image.jpeg.length + 36) / 1024);
-    picker.setAttribute("free", String(badge.info.freespace));
+    badge.info.freespace -= neededKb(picker.image.jpeg.length);
+    connect.setImageKb(neededKb(picker.image.jpeg.length));
   }
 });

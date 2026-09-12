@@ -25,7 +25,8 @@
     .row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
     .status, .readout, .text { color: var(--muted); }
     .encoded-tag { color: var(--muted); font-size: .8rem; font-style: italic; }
-    .readout.bad { color: var(--bad); font-weight: 600; }
+    .bad { color: var(--bad); font-weight: 600; }
+    .readout-row { min-height: 1.4em; } /* reserve the line so it never shifts the sliders */
     dl.info { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .75rem; margin: 0; font-size: .9rem; }
     dl.info dt { color: var(--muted); } dl.info dd { margin: 0; font-family: ui-monospace, monospace; }
     /* The panel is round, so the preview is too — you see exactly the crop the badge will show. */
