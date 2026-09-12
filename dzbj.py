@@ -12,7 +12,7 @@ dzbj.py — minimal BLE client for the "DZBJ-" digital display badge (E-Goods ap
   uv run dzbj.py listen --wait 20         # connect, subscribe to everything, log all frames
   uv run dzbj.py rawsend img.jpg --container imb --envelope --framing c0 --count 3
                                           # receive-mode format probing: see cmd_rawsend
-  uv run dzbj.py add photo.png            # upload one still (ALBUM, type 6)
+  uv run dzbj.py add a.png b.jpg ...      # upload stills (ALBUM, type 6) on one connection
   uv run dzbj.py remove NAME              # not in the known protocol — see probe
   uv run dzbj.py probe 7                  # send {"type":7} (VERSION_QUERY) and dump replies
   uv run dzbj.py probe 13 '{"devname":"x"}'  # send a JSON command with extra fields
@@ -390,17 +390,27 @@ async def cmd_add(args):
         if b.failed.is_set():
             sys.exit("badge disconnected during connect/subscribe")
         w, h = b.size
-        jpeg = prepare_jpeg(args.image, w, h, args.quality)
-        blob = imb_container(jpeg, w, h)
-        need_kb = math.ceil(len(blob) / 1024)
-        free = (b.info or {}).get("freespace")
-        print(f"jpeg {len(jpeg)} B, container {len(blob)} B (~{need_kb} KB), device free {free} KB", file=sys.stderr)
-        if isinstance(free, int) and need_kb > free and not args.force:
-            sys.exit("not enough free space on device (use --force to send anyway)")
         gap = args.gap if args.gap is not None else (0.01 if (b.info or {}).get("time_mode") == 1 else PACKET_GAP_S)
-        pkts = fragment_image(TYPE["ALBUM"], blob, args.chunk)
-        await b.send_packets(pkts, gap)
-        print("upload finished")
+        free = (b.info or {}).get("freespace")
+        # Several images ride the same connection: connect/subscribe costs seconds and the
+        # badge's idle timer is short, so re-dialling per image is the worst of both worlds.
+        # After each upload the badge shows "Updating..." while it writes flash and renders;
+        # --pause gives it that time before the next stream starts (no ack to wait for).
+        for idx, image in enumerate(args.image, 1):
+            jpeg = prepare_jpeg(image, w, h, args.quality)
+            blob = imb_container(jpeg, w, h)
+            need_kb = math.ceil(len(blob) / 1024)
+            print(f"[{idx}/{len(args.image)}] {image}: jpeg {len(jpeg)} B, container {len(blob)} B "
+                  f"(~{need_kb} KB), device free {free} KB", file=sys.stderr)
+            if isinstance(free, int) and need_kb > free and not args.force:
+                sys.exit("not enough free space on device (use --force to send anyway)")
+            pkts = fragment_image(TYPE["ALBUM"], blob, args.chunk)
+            await b.send_packets(pkts, gap)
+            if isinstance(free, int):
+                free -= need_kb           # device never re-reports; keep our own estimate
+            print(f"[{idx}/{len(args.image)}] upload finished")
+            if idx < len(args.image):
+                await asyncio.sleep(args.pause)
 
 
 async def cmd_rawsend(args):
@@ -511,8 +521,9 @@ def main():
     p.add_argument("--wait", type=float, default=20.0, help="seconds to listen")
     p.set_defaults(fn=cmd_listen)
 
-    p = sub.add_parser("add", help="upload one still image (ALBUM)")
-    p.add_argument("image")
+    p = sub.add_parser("add", help="upload one or more still images (ALBUM) on a single connection")
+    p.add_argument("image", nargs="+")
+    p.add_argument("--pause", type=float, default=2.0, help="seconds to let the badge render between images")
     p.add_argument("--quality", type=int, default=100, help="JPEG quality (app uses 100)")
     p.add_argument("--chunk", type=int, default=ALBUM_CHUNK, help="payload bytes per packet (app: 496)")
     p.add_argument("--force", action="store_true", help="skip the free-space check")
