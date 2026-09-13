@@ -131,7 +131,7 @@ export class ImageList extends HTMLElement {
     const meta = li.querySelector<HTMLElement>(".meta")!;
     if (entry.prepared) {
       img.src = entry.prepared.previewUrl;
-      meta.textContent = `${formatBytes(entry.prepared.bytes)} · q${entry.quality.toFixed(2)}`;
+      meta.textContent = `${formatBytes(entry.prepared.bytes)} · quality ${entry.quality.toFixed(2)}`;
     } else {
       meta.textContent = "encoding…";
     }

@@ -30,6 +30,7 @@ export class ImagePicker extends HTMLElement {
   private encodeSerial = 0; // discard results of encodes that were superseded mid-flight
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchStart: { dist: number; zoom: number } | null = null;
+  private hintTimer = 0;
 
   private drop!: HTMLElement;
   private canvas!: HTMLCanvasElement;
@@ -47,13 +48,14 @@ export class ImagePicker extends HTMLElement {
       <div class="drop" tabindex="0" title="drag to pan, wheel or pinch to zoom, double-click to reset">
         <canvas class="preview" hidden></canvas>
         <span class="hint">add a picture to start</span>
+        <span class="ring-hint" role="status" hidden>zoom in to reposition</span>
       </div>
       <div class="hstack mt-4 controls">
         <label>zoom <input type="range" class="zoom" min="1" max="${MAX_ZOOM}" step="0.01" value="1" disabled></label>
         <button type="button" class="reset outline" data-variant="secondary" disabled>reset</button>
       </div>
       <div class="hstack mt-2 controls">
-        <label>quality <output></output> <input type="range" class="quality" min="0.1" max="1" step="0.05" value="0.7" disabled></label>
+        <label>quality <output>0.70</output> <input type="range" class="quality" min="0.1" max="1" step="0.05" value="0.7" disabled></label>
       </div>
       <div class="hstack mt-2 readout-row">
         <span class="readout text-light" aria-live="polite"></span>
@@ -124,6 +126,7 @@ export class ImagePicker extends HTMLElement {
     this.querySelector<HTMLElement>(".sent-tag")!.hidden = !entry?.sent;
     if (!entry) {
       this.readout.textContent = "";
+      this.querySelector("output")!.textContent = "0.70"; // the default a new picture will get
       return;
     }
     this.slider.value = String(entry.quality);
@@ -184,7 +187,13 @@ export class ImagePicker extends HTMLElement {
 
   private onPointerDown = (e: PointerEvent): void => {
     if (!this.entry) return;
-    this.drop.setPointerCapture(e.pointerId);
+    // A drag on the ring is a pan, never a text selection of the controls under it.
+    e.preventDefault();
+    try {
+      this.drop.setPointerCapture(e.pointerId);
+    } catch {
+      /* synthetic or already-released pointer; panning still works without capture */
+    }
     this.pointers.set(e.pointerId, this.canvasPoint(e));
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
@@ -205,8 +214,18 @@ export class ImagePicker extends HTMLElement {
     } else if (this.pointers.size === 1) {
       const v = this.entry.view;
       this.setView({ ...v, dx: v.dx + (cur.x - prev.x), dy: v.dy + (cur.y - prev.y) });
+      // At cover fit there is nothing to pan: the clamp swallows the whole drag and the
+      // picture does not move. Say why, once per drag, instead of looking broken.
+      if (this.entry.view.dx === v.dx && this.entry.view.dy === v.dy && this.entry.view.zoom <= 1) this.showRingHint();
     }
   };
+
+  private showRingHint(): void {
+    const hint = this.querySelector<HTMLElement>(".ring-hint")!;
+    hint.hidden = false;
+    clearTimeout(this.hintTimer);
+    this.hintTimer = window.setTimeout(() => (hint.hidden = true), 1600);
+  }
 
   private onPointerUp = (e: PointerEvent): void => {
     this.pointers.delete(e.pointerId);

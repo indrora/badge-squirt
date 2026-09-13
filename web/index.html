@@ -33,7 +33,9 @@
     .rail { grid-area: rail; display: grid; gap: var(--space-6); align-content: start; }
     .stage { grid-area: stage; display: grid; align-content: start; justify-items: center; padding-top: var(--space-4); }
     .bar { grid-area: bar; position: sticky; bottom: 0; z-index: 2; background: var(--card); border: 1px solid var(--border);
-           border-radius: var(--radius-medium); padding: var(--space-3) var(--space-4); box-shadow: 0 -6px 18px -12px rgb(0 0 0 / .35); }
+           border-radius: var(--radius-medium); padding: var(--space-3) var(--space-4);
+           /* the lift that says "this floats over the page"; the light scheme needs a darker, tighter shadow to read at all */
+           box-shadow: light-dark(0 -4px 14px -8px rgb(0 0 0 / .28), 0 -6px 18px -12px rgb(0 0 0 / .35)); }
     .drawer { grid-area: drawer; }
     footer { grid-area: foot; color: var(--muted-foreground); font-size: var(--text-8); text-align: center; padding-block: var(--space-4) var(--space-8); }
     footer a { color: inherit; }
@@ -81,7 +83,12 @@
     /* stage: the round preview at the badge's real pixel size; you see exactly the crop it will show */
     .drop { display: grid; place-items: center; width: 368px; height: 368px; max-width: 100%; aspect-ratio: 1;
             border-radius: 50%; border: 2px dashed var(--border); overflow: hidden; background: #000; }
-    .drop.loaded { cursor: grab; touch-action: none; user-select: none; border-style: solid; }
+    .drop.loaded { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-style: solid; }
+    .drop.grabbing ~ *, .stage:has(.grabbing) { user-select: none; } /* a pan never selects the sliders' text */
+    .drop { position: relative; }
+    .ring-hint { position: absolute; inset: auto 0 12% 0; margin-inline: auto; width: max-content; padding: var(--space-1) var(--space-3);
+                 border-radius: var(--radius-full); background: color-mix(in srgb, var(--background) 82%, transparent); color: var(--foreground);
+                 font-size: var(--text-8); pointer-events: none; }
     .drop.grabbing { cursor: grabbing; }
     .drop .preview { width: 100%; height: 100%; display: block; }
     .drop .hint { color: var(--muted-foreground); text-align: center; padding: var(--space-4); font-size: var(--text-7); }
