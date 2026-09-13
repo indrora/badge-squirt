@@ -44,11 +44,14 @@ export class UploadProgress extends HTMLElement {
     this.innerHTML = `
       <div class="actions">
         <button type="button" class="send-each" disabled>Send</button>
-        <div class="anim-group">
-          <button type="button" class="send-anim" data-variant="secondary" disabled>Send as animation</button>
-          <label class="frame-time-label">frame time <output>${DEFAULT_FRAME_S.toFixed(1)} s</output>
-            <input type="range" class="frame-time" min="0.5" max="10" step="0.5" value="${DEFAULT_FRAME_S}" aria-label="frame time in seconds"></label>
-        </div>
+        <details class="anim-group" open>
+          <summary>as one animation…</summary>
+          <div class="anim-body">
+            <button type="button" class="send-anim" data-variant="secondary" disabled>Send as animation</button>
+            <label class="frame-time-label">frame time <output>${DEFAULT_FRAME_S.toFixed(1)} s</output>
+              <input type="range" class="frame-time" min="0.5" max="10" step="0.5" value="${DEFAULT_FRAME_S}" aria-label="frame time in seconds"></label>
+          </div>
+        </details>
         <button type="button" class="abort ghost" data-variant="danger" hidden>Abort</button>
       </div>
       <p class="consequence text-light" aria-live="polite"></p>
@@ -69,6 +72,14 @@ export class UploadProgress extends HTMLElement {
     this.frameTime.addEventListener("input", () => {
       this.querySelector("output")!.textContent = `${Number(this.frameTime.value).toFixed(1)} s`;
     });
+    // On a phone the bar must stay thumb-height, so the animation verb and its slider fold
+    // behind a disclosure; on a laptop there is room and the disclosure is always open with
+    // its summary hidden (index.html). A <details> cannot be forced open from CSS alone.
+    const narrow = matchMedia("(max-width: 720px)");
+    const details = this.querySelector<HTMLDetailsElement>(".anim-group")!;
+    const apply = () => (details.open = !narrow.matches);
+    apply();
+    narrow.addEventListener("change", apply);
   }
 
   /** Free-space override, owned by <space-gauge>; main.ts forwards its change event here. */

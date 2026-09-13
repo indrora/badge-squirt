@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>badge squirt</title>
   <link rel="icon" href="data:,">
   <!-- Oat (oat.ink): semantic, classless-ish UI kit. npm dependency served from node_modules;
@@ -96,7 +96,10 @@
     ul.entries .remove:hover, ul.entries .remove:focus-visible { color: var(--danger); }
 
     /* stage: the round preview at the badge's real pixel size; you see exactly the crop it will show */
-    .drop { display: grid; place-items: center; width: 368px; height: 368px; max-width: 100%; aspect-ratio: 1;
+    /* the ring is the badge's real 368 px wherever that fits, and the full column width where
+       it does not (a 375 px phone has 343 px of column); aspect-ratio keeps it round */
+    image-picker { width: 100%; max-width: 368px; }
+    .drop { display: grid; place-items: center; width: 100%; aspect-ratio: 1; margin: 0 auto;
             border-radius: 50%; border: 2px dashed var(--border); overflow: hidden; background: #000; }
     .drop.loaded { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-style: solid; }
     .drop.grabbing ~ *, .stage:has(.grabbing) { user-select: none; } /* a pan never selects the sliders' text */
@@ -124,23 +127,43 @@
     .drop ol.steps li.live { color: var(--foreground); font-weight: var(--font-semibold); }
     .drop ol.steps li.done { text-decoration: line-through; color: var(--faint-foreground); }
     image-picker { display: grid; justify-items: center; }
-    .controls label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); }
+    .controls { width: 100%; justify-content: center; }
+    .controls label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); flex: 1 1 auto; min-width: 0; }
     .controls output, .frame-time-label output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 2.6em; }
-    input[type=range] { width: 180px; }
-    .readout-row { min-height: 1.6em; font-size: var(--text-7); justify-content: center; } /* reserved line so the sliders never shift */
+    input[type=range] { width: clamp(120px, 100%, 180px); flex: 1 1 120px; min-width: 0; }
+    .readout-row { min-height: 1.6em; font-size: var(--text-7); justify-content: center; text-align: center; } /* reserved line so the sliders never shift */
+    .readout-row .readout { overflow-wrap: anywhere; }
     .readout-row .readout { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-8); }
 
     /* action bar */
     upload-progress { display: grid; gap: var(--space-2); }
     .actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
-    .anim-group { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+    .anim-group { display: contents; } /* laptop: no disclosure chrome, the group is just inline */
+    .anim-group > summary { display: none; }
+    .anim-body { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
     .frame-time-label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); }
     .consequence { margin: 0; font-size: var(--text-7); }
     .consequence.bad { color: var(--danger); }
     button.send-each.anyway { background: var(--danger); color: var(--danger-foreground); }
     .progress-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: var(--space-4); }
     .progress-row .text { margin: 0; font-size: var(--text-7); font-variant-numeric: tabular-nums; text-align: end; }
-    @media (max-width: 720px) { .progress-row { grid-template-columns: 1fr; } .progress-row .text { text-align: start; } }
+    @media (max-width: 720px) {
+      /* phone: the bar is thumb-height. Send spans the width; the animation verb and its slider
+         fold behind a disclosure; progress and its text stack; safe-area padding for the home bar */
+      .bar { padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); }
+      /* Oat's tooltip pseudo-element on the send verbs is ~500 px wide and, though hidden,
+         still counts as scrollable overflow on a 375 px page; clip keeps it out of scroll width */
+      .bar { overflow-x: clip; }
+      .actions { gap: var(--space-2); }
+      .send-each { flex: 1 1 100%; }
+      .anim-group { display: block; flex: 1 1 100%; border-top: 1px solid var(--border); padding-top: var(--space-2); }
+      .anim-group > summary { display: list-item; font-size: var(--text-7); color: var(--muted-foreground); cursor: pointer; padding: var(--space-1) 0; }
+      .anim-body { padding-top: var(--space-2); }
+      .anim-body .send-anim { flex: 1 1 100%; }
+      .frame-time-label { flex: 1 1 100%; }
+      .progress-row { grid-template-columns: 1fr; gap: var(--space-1); } .progress-row .text { text-align: start; }
+      .consequence { font-size: var(--text-8); }
+    }
     .sent-tag { margin-inline-start: var(--space-2); }
 
     /* drawer */

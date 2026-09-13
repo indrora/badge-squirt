@@ -65,6 +65,7 @@ export class SpaceGauge extends HTMLElement {
     badge.on("disconnected", () => this.render());
     store.on("change", () => this.render());
     store.on("update", () => this.render());
+    this.render(); // first paint: nothing connected, override hidden, bar empty
   }
 
   /** KB the un-sent queue would take on the badge. */

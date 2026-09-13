@@ -9,8 +9,9 @@ web
 ## Users
 
 Hobbyist owners of the "DZBJ-" round BLE picture badge (sold with the e-Goods Android
-app), at a laptop running Chrome or Edge, wanting a picture (or a short animation) on
-the badge in under a minute without installing the vendor app or creating an account.
+app), at a laptop running Chrome or Edge, or on an Android phone in Chrome, wanting a
+picture (or a short animation) on the badge in under a minute without installing the
+vendor app or creating an account.
 Technical-ish, occasional use: a session is "pick, frame, send", then walk away.
 
 ## Product Purpose
@@ -50,7 +51,9 @@ No claim of superiority beyond that; it is a community tool that works.
 * No bundler: TypeScript compiled by tsc to browser ES modules; UI kit is Oat (@knadh/oat)
   as an npm dependency. Deployed to GitHub Pages on `release-YYYY.n` tags.
 * Badge-to-badge share mode is not supported (protocol unsolved; see doc §7).
-* Undecided: whether phones (Android Chrome) are a target — currently laptops only.
+* Phones: Android Chrome is a confirmed target (verified working 2026-09-13); the page must
+  fit a 375 px portrait viewport with the send bar within thumb reach. iOS is not a target
+  (no Web Bluetooth in Safari or iOS Chrome).
 
 ## Brand Commitments
 
