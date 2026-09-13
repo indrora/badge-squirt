@@ -45,17 +45,18 @@ export class ImagePicker extends HTMLElement {
 
   connectedCallback(): void {
     this.innerHTML = `
-      <div class="drop" tabindex="0" title="drag to pan, wheel or pinch to zoom, double-click to reset">
-        <canvas class="preview" hidden></canvas>
+      <div class="drop" tabindex="0" role="group" aria-label="framing: drag or arrow keys to pan, wheel or plus and minus to zoom, 0 to reset"
+           aria-describedby="ring-status">
+        <canvas class="preview" hidden aria-label="encoded preview"></canvas>
         <span class="hint">add a picture to start</span>
-        <span class="ring-hint" role="status" hidden>zoom in to reposition</span>
+        <span class="ring-hint" id="ring-status" role="status" aria-live="polite" hidden>zoom in to reposition</span>
       </div>
       <div class="hstack mt-4 controls">
-        <label>zoom <input type="range" class="zoom" min="1" max="${MAX_ZOOM}" step="0.01" value="1" disabled></label>
+        <label>zoom <input type="range" class="zoom" min="1" max="${MAX_ZOOM}" step="0.01" value="1" disabled aria-label="zoom"></label>
         <button type="button" class="reset outline" data-variant="secondary" disabled>reset</button>
       </div>
       <div class="hstack mt-2 controls">
-        <label>quality <output>0.70</output> <input type="range" class="quality" min="0.1" max="1" step="0.05" value="0.7" disabled></label>
+        <label>quality <output>0.70</output> <input type="range" class="quality" min="0.1" max="1" step="0.05" value="0.7" disabled aria-label="JPEG quality"></label>
       </div>
       <div class="hstack mt-2 readout-row">
         <span class="readout text-light" aria-live="polite"></span>
@@ -75,6 +76,7 @@ export class ImagePicker extends HTMLElement {
     this.drop.addEventListener("pointercancel", this.onPointerUp);
     this.drop.addEventListener("wheel", this.onWheel, { passive: false });
     this.drop.addEventListener("dblclick", () => this.setView(IDENTITY_VIEW));
+    this.drop.addEventListener("keydown", this.onKey);
     this.zoomSlider.addEventListener("input", () => this.zoomTo(Number(this.zoomSlider.value)));
     this.querySelector(".reset")!.addEventListener("click", () => this.setView(IDENTITY_VIEW));
 
@@ -131,6 +133,7 @@ export class ImagePicker extends HTMLElement {
     }
     this.slider.value = String(entry.quality);
     this.querySelector("output")!.textContent = entry.quality.toFixed(2);
+    this.canvas.setAttribute("aria-label", `encoded preview of ${entry.name}`);
     this.draw();
     if (!entry.prepared) return; // store.add is encoding; the "update" listener paints it
     // Already encoded: show it straight away, unless the badge's size changed meanwhile.
@@ -220,12 +223,43 @@ export class ImagePicker extends HTMLElement {
     }
   };
 
-  private showRingHint(): void {
+  private showRingHint(text = "zoom in to reposition"): void {
     const hint = this.querySelector<HTMLElement>(".ring-hint")!;
+    hint.textContent = text;
     hint.hidden = false;
     clearTimeout(this.hintTimer);
     this.hintTimer = window.setTimeout(() => (hint.hidden = true), 1600);
   }
+
+  /**
+   * Keyboard equivalent of the pointer gestures, on the focused ring: arrows pan (shift for
+   * a bigger step), + / - zoom about the centre, 0 resets. Each move is announced through
+   * the ring's status region so a screen-reader user hears where the framing went.
+   */
+  private onKey = (e: KeyboardEvent): void => {
+    if (!this.entry) return;
+    const v = this.entry.view;
+    const step = e.shiftKey ? 32 : 8;
+    const pan: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (e.key in pan) {
+      const [dx, dy] = pan[e.key]!;
+      this.setView({ ...v, dx: v.dx + dx, dy: v.dy + dy });
+      const moved = this.entry.view.dx !== v.dx || this.entry.view.dy !== v.dy;
+      this.showRingHint(moved ? `panned to ${Math.round(this.entry.view.dx)}, ${Math.round(this.entry.view.dy)} px` : v.zoom <= 1 ? "zoom in to reposition" : "at the edge");
+    } else if (e.key === "+" || e.key === "=") {
+      this.zoomTo(v.zoom * 1.15);
+      this.showRingHint(`zoom ${this.entry.view.zoom.toFixed(2)}×`);
+    } else if (e.key === "-" || e.key === "_") {
+      this.zoomTo(v.zoom / 1.15);
+      this.showRingHint(`zoom ${this.entry.view.zoom.toFixed(2)}×`);
+    } else if (e.key === "0") {
+      this.setView(IDENTITY_VIEW);
+      this.showRingHint("reset to fit");
+    } else {
+      return;
+    }
+    e.preventDefault();
+  };
 
   private onPointerUp = (e: PointerEvent): void => {
     this.pointers.delete(e.pointerId);

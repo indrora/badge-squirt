@@ -26,13 +26,13 @@ export class ImageList extends HTMLElement {
   connectedCallback(): void {
     this.innerHTML = `
       <div class="hstack justify-between">
-        <span class="rail-title">Queue</span>
+        <h2 class="rail-title">Queue</h2>
         <button type="button" class="add" data-variant="secondary">Add pictures…</button>
         <input type="file" accept="image/*" multiple hidden>
       </div>
       <p class="text-light hint">Drop or paste images anywhere. GIFs keep their frames.</p>
       <ul class="entries unstyled" role="listbox" aria-label="pictures to send"></ul>
-      <p class="undo-line text-light" role="status" hidden>
+      <p class="undo-line text-light" role="status" aria-live="polite" hidden>
         <span class="undo-text"></span> <button type="button" class="undo ghost">Undo</button>
       </p>`;
     this.list = this.querySelector("ul")!;
@@ -62,8 +62,10 @@ export class ImageList extends HTMLElement {
     // Removal is one click; say what went and offer the way back until the store purges it.
     store.on("removed", (e) => {
       const line = this.querySelector<HTMLElement>(".undo-line")!;
-      this.querySelector<HTMLElement>(".undo-text")!.textContent = `removed ${e.detail.name}`;
       line.hidden = false;
+      // Un-hide first, populate next tick: a live region that appears already filled is
+      // skipped by some screen readers, one that changes while visible is announced.
+      setTimeout(() => (this.querySelector<HTMLElement>(".undo-text")!.textContent = `removed ${e.detail.name}`), 0);
     });
     store.on("purged", () => (this.querySelector<HTMLElement>(".undo-line")!.hidden = true));
   }

@@ -52,7 +52,7 @@ export class UploadProgress extends HTMLElement {
       </div>
       <p class="consequence text-light" aria-live="polite"></p>
       <div class="progress-row">
-        <progress max="1" value="0"></progress>
+        <progress max="1" value="0" aria-label="upload progress"></progress>
         <span class="text text-light" aria-live="polite">nothing sent yet</span>
       </div>`;
     this.sendEach = this.querySelector(".send-each")!;
@@ -117,6 +117,10 @@ export class UploadProgress extends HTMLElement {
         : `adds ${need} KB to what is already on the badge; the badge cannot undo this from here${
             typeof free === "number" && need > free ? (this.override ? " · free-space check is OFF" : ` · does not fit: ${need} KB needed, ${free} KB free`) : ""
           }`;
+    // The animation verb's eligibility is stated here too, not only in its tooltip.
+    if (connected && n > 0 && (n < ANIMATED_MIN || n > ANIMATED_MAX)) {
+      this.consequence.textContent += n < ANIMATED_MIN ? ` · as one animation needs ${ANIMATED_MIN}–${ANIMATED_MAX} pictures` : ` · as one animation takes at most ${ANIMATED_MAX} pictures`;
+    }
     this.consequence.classList.toggle("bad", typeof free === "number" && need > free);
     this.sendEach.title = "each picture becomes its own image on the badge";
 

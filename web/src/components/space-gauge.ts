@@ -29,10 +29,10 @@ export class SpaceGauge extends HTMLElement {
   connectedCallback(): void {
     this.innerHTML = `
       <div class="gauge-head">
-        <span>Badge storage</span>
+        <h2>Badge storage</h2>
         <span class="caption text-light" aria-live="polite">connect to see space</span>
       </div>
-      <meter min="0" max="1" value="0" aria-label="badge storage used, including queued pictures"></meter>
+      <meter min="0" max="1" value="0" aria-label="badge storage used, including queued pictures" aria-hidden="true"></meter>
       <label class="override" data-variant="danger">
         <input type="checkbox"> send even if it will not fit
         <span class="text-light">the badge may refuse or truncate; use when the report above is wrong</span>
@@ -70,6 +70,7 @@ export class SpaceGauge extends HTMLElement {
       this.meter.max = 1;
       this.meter.value = 0;
       this.meter.removeAttribute("high");
+      this.meter.setAttribute("aria-hidden", "true"); // "0 of 1" would be a lie; the caption speaks instead
       this.caption.textContent = queued ? `${queued} KB queued · connect to see space` : "connect to see space";
       this.classList.remove("over");
       return;
@@ -85,6 +86,7 @@ export class SpaceGauge extends HTMLElement {
     // optimum below `low` → above `high` becomes "even less good" = danger, used for overflow.
     this.meter.optimum = over ? 0 : total / 2;
     this.meter.value = Math.min(fill, total);
+    this.meter.removeAttribute("aria-hidden");
     this.classList.toggle("over", over);
     this.caption.textContent = over
       ? `${used} KB used · ${queued} KB queued · over by ${fill - total} KB`

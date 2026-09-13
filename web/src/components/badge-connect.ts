@@ -23,6 +23,7 @@ export class BadgeConnect extends HTMLElement {
 
   connectedCallback(): void {
     this.innerHTML = `
+      <h2 class="rail-title">Badge</h2>
       <p class="ritual">Press the button on the badge, then connect within a few seconds. Chrome will show a chooser; pick the one starting <code>DZB</code>.</p>
       <div class="vstack gap-2">
         <button type="button">Connect badge</button>

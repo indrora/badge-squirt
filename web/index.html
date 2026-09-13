@@ -47,7 +47,7 @@
     /* rail sections read as one column of hardware facts: a title, then content */
     .rail > section { display: grid; gap: var(--space-3); }
     .rail > section + section { border-top: 1px solid var(--border); padding-top: var(--space-4); }
-    .rail-title, .gauge-head span:first-child { font-size: var(--text-7); font-weight: var(--font-semibold); }
+    .rail h2 { margin: 0; font-size: var(--text-7); font-weight: var(--font-semibold); line-height: var(--leading-normal); }
     .ritual { margin: 0; font-size: var(--text-7); color: var(--muted-foreground); }
     dl.info { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-4); margin: 0; font-size: var(--text-7); }
     dl.info dt { color: var(--muted-foreground); } dl.info dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -77,7 +77,8 @@
     ul.entries .name .badge { padding-inline: var(--space-2); }
     ul.entries .meta { grid-column: 2; grid-row: 2; font-size: var(--text-8); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
     /* remove is quiet at rest (muted, currentColor); danger only when it is about to happen */
-    ul.entries .remove { grid-column: 3; grid-row: 1 / span 2; padding: var(--space-1) var(--space-2); color: var(--muted-foreground); }
+    /* 14 px icon, 40 px hit area: the ghost variant's padding alone shrank this to 24 px tall */
+    ul.entries .remove { grid-column: 3; grid-row: 1 / span 2; min-width: 40px; min-height: 40px; padding: 0; color: var(--muted-foreground); }
     ul.entries .remove:hover, ul.entries .remove:focus-visible { color: var(--danger); }
 
     /* stage: the round preview at the badge's real pixel size; you see exactly the crop it will show */
@@ -115,7 +116,7 @@
     /* drawer */
     /* Oat styles <details>/<summary> as an accordion (chevron, frame); we only size the text */
     details.drawer summary { font-size: var(--text-7); color: var(--muted-foreground); }
-    details.drawer summary .text-lighter { margin-inline-start: var(--space-2); }
+    details.drawer summary .text-lighter { margin-inline-start: var(--space-2); color: var(--muted-foreground); } /* faint fails AA at 14 px */
     debug-log { display: block; margin-top: var(--space-3); }
     pre.log { margin: 0; max-height: 260px; overflow: auto; font-size: var(--text-8); line-height: 1.35; font-family: var(--font-mono);
               background: var(--muted); padding: var(--space-3); border-radius: var(--radius-medium); white-space: pre-wrap; word-break: break-all; }

@@ -108,8 +108,9 @@ if (location.search.includes("demo")) {
 }
 
 // The Pages workflow drops the release tag into VERSION next to index.html; locally there
-// is no such file and the footer just stays blank.
-fetch("VERSION")
+// is no such file, so skip the request (and its console 404) and leave the footer blank.
+if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname))
+  fetch("VERSION")
   .then((r) => (r.ok ? r.text() : ""))
   .then((v) => (document.querySelector(".version")!.textContent = v.trim()))
   .catch(() => undefined);
