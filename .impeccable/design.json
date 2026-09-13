@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-12T00:00:00Z",
+  "title": "Design System: badge squirt",
+  "extensions": {
+    "tokenAuthority": "Oat (@knadh/oat) css/01-theme.css, inherited unchanged. All colour values are Oat's light-dark() pairs; tonalRamp arrays are synthesized in OKLCH for the panel only and are not project tokens.",
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Warm Slate", "canonical": "light-dark(#574747, #fafafa)", "tonalRamp": ["oklch(15% 0.02 20)", "oklch(25% 0.02 20)", "oklch(36% 0.02 20)", "oklch(48% 0.02 20)", "oklch(60% 0.02 20)", "oklch(72% 0.02 20)", "oklch(84% 0.02 20)", "oklch(95% 0.02 20)"] },
+      "background": { "role": "neutral", "displayName": "Page", "canonical": "light-dark(#fff, #09090b)", "tonalRamp": ["oklch(15% 0.005 286)", "oklch(25% 0.005 286)", "oklch(36% 0.005 286)", "oklch(48% 0.005 286)", "oklch(60% 0.005 286)", "oklch(72% 0.005 286)", "oklch(84% 0.005 286)", "oklch(95% 0.005 286)"] },
+      "foreground": { "role": "neutral", "displayName": "Ink", "canonical": "light-dark(#09090b, #fafafa)", "tonalRamp": ["oklch(15% 0.005 286)", "oklch(25% 0.005 286)", "oklch(36% 0.005 286)", "oklch(48% 0.005 286)", "oklch(60% 0.005 286)", "oklch(72% 0.005 286)", "oklch(84% 0.005 286)", "oklch(95% 0.005 286)"] },
+      "card": { "role": "neutral", "displayName": "Card", "canonical": "light-dark(#fff, #18181b)", "tonalRamp": ["oklch(15% 0.005 286)", "oklch(25% 0.005 286)", "oklch(36% 0.005 286)", "oklch(48% 0.005 286)", "oklch(60% 0.005 286)", "oklch(72% 0.005 286)", "oklch(84% 0.005 286)", "oklch(95% 0.005 286)"] },
+      "secondary": { "role": "neutral", "displayName": "Secondary", "canonical": "light-dark(#f4f4f5, #27272a)", "tonalRamp": ["oklch(15% 0.005 286)", "oklch(25% 0.005 286)", "oklch(36% 0.005 286)", "oklch(48% 0.005 286)", "oklch(60% 0.005 286)", "oklch(72% 0.005 286)", "oklch(84% 0.005 286)", "oklch(95% 0.005 286)"] },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "light-dark(#f4f4f5, #27272a)", "tonalRamp": ["oklch(15% 0.005 286)", "oklch(25% 0.005 286)", "oklch(36% 0.005 286)", "oklch(48% 0.005 286)", "oklch(60% 0.005 286)", "oklch(72% 0.005 286)", "oklch(84% 0.005 286)", "oklch(95% 0.005 286)"] },
+      "muted-foreground": { "role": "neutral", "displayName": "Muted Ink", "canonical": "light-dark(#71717a, #a1a1aa)", "tonalRamp": ["oklch(15% 0.01 286)", "oklch(25% 0.01 286)", "oklch(36% 0.01 286)", "oklch(48% 0.01 286)", "oklch(60% 0.01 286)", "oklch(72% 0.01 286)", "oklch(84% 0.01 286)", "oklch(95% 0.01 286)"] },
+      "faint-foreground": { "role": "neutral", "displayName": "Faint Ink", "canonical": "light-dark(#a1a1aa, #71717a)", "tonalRamp": ["oklch(15% 0.01 286)", "oklch(25% 0.01 286)", "oklch(36% 0.01 286)", "oklch(48% 0.01 286)", "oklch(60% 0.01 286)", "oklch(72% 0.01 286)", "oklch(84% 0.01 286)", "oklch(95% 0.01 286)"] },
+      "accent": { "role": "neutral", "displayName": "Accent Wash", "canonical": "light-dark(#f4f4f5, #27272a)", "tonalRamp": ["oklch(15% 0.005 286)", "oklch(25% 0.005 286)", "oklch(36% 0.005 286)", "oklch(48% 0.005 286)", "oklch(60% 0.005 286)", "oklch(72% 0.005 286)", "oklch(84% 0.005 286)", "oklch(95% 0.005 286)"] },
+      "border": { "role": "neutral", "displayName": "Hairline", "canonical": "light-dark(#d4d4d8, #52525b)", "tonalRamp": ["oklch(15% 0.01 286)", "oklch(25% 0.01 286)", "oklch(36% 0.01 286)", "oklch(48% 0.01 286)", "oklch(60% 0.01 286)", "oklch(72% 0.01 286)", "oklch(84% 0.01 286)", "oklch(95% 0.01 286)"] },
+      "ring": { "role": "neutral", "displayName": "Ring", "canonical": "light-dark(#574747, #d4d4d8)", "tonalRamp": ["oklch(15% 0.02 20)", "oklch(25% 0.02 20)", "oklch(36% 0.02 20)", "oklch(48% 0.02 20)", "oklch(60% 0.02 20)", "oklch(72% 0.02 20)", "oklch(84% 0.02 20)", "oklch(95% 0.02 20)"] },
+      "success": { "role": "semantic", "displayName": "Meter Healthy", "canonical": "light-dark(#008032, #6cc070)", "tonalRamp": ["oklch(15% 0.1 150)", "oklch(25% 0.12 150)", "oklch(36% 0.14 150)", "oklch(48% 0.16 150)", "oklch(60% 0.16 150)", "oklch(72% 0.14 150)", "oklch(84% 0.1 150)", "oklch(95% 0.04 150)"] },
+      "warning": { "role": "semantic", "displayName": "Meter Past 90%", "canonical": "light-dark(#a65b00, #f0a030)", "tonalRamp": ["oklch(15% 0.06 65)", "oklch(25% 0.09 65)", "oklch(36% 0.12 65)", "oklch(48% 0.14 65)", "oklch(60% 0.15 65)", "oklch(72% 0.14 65)", "oklch(84% 0.1 65)", "oklch(95% 0.04 65)"] },
+      "danger": { "role": "semantic", "displayName": "Meter Over / Latent Danger", "canonical": "light-dark(#d32f2f, #f4807b)", "tonalRamp": ["oklch(15% 0.08 25)", "oklch(25% 0.12 25)", "oklch(36% 0.16 25)", "oklch(48% 0.19 25)", "oklch(60% 0.2 25)", "oklch(72% 0.16 25)", "oklch(84% 0.1 25)", "oklch(95% 0.03 25)"] },
+      "panel-black": { "role": "neutral", "displayName": "Panel Black", "canonical": "#000", "tonalRamp": ["oklch(0% 0 0)", "oklch(10% 0 0)", "oklch(20% 0 0)", "oklch(30% 0 0)", "oklch(40% 0 0)", "oklch(50% 0 0)", "oklch(60% 0 0)", "oklch(70% 0 0)"] }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "The lowercase wordmark; the only heading on the page." },
+      "body": { "displayName": "Body", "purpose": "Oat's default; inherited by unsized status lines." },
+      "ui": { "displayName": "UI", "purpose": "The working size: copy, hints, button and slider labels, dt labels, summary." },
+      "label": { "displayName": "Label", "purpose": "Rail section titles as semibold spans, sentence case." },
+      "numeral": { "displayName": "Numeral", "purpose": "Device readout values and slider outputs; mono tabular." },
+      "numeral-small": { "displayName": "Numeral Small", "purpose": "Gauge caption, queue meta, encoded readout, progress text; mono tabular." },
+      "log": { "displayName": "Log", "purpose": "The debug drawer pre; mono at 1.35 line-height." }
+    },
+    "shadows": [
+      { "name": "bar-lift", "value": "0 -6px 18px -12px rgb(0 0 0 / .35)", "purpose": "The sticky action bar only, so it reads as a surface when it floats over scrolled content. Diffuse; never offset or hard-edged." }
+    ],
+    "motion": [
+      { "name": "meter-fill", "value": "width 240ms cubic-bezier(.2,.8,.2,1)", "purpose": "The storage meter fill easing to its new length when the queue changes; the page's only authored motion. Disabled under prefers-reduced-motion." },
+      { "name": "oat-transition-fast", "value": "120ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Oat's own button hover/active and summary hover; inherited." },
+      { "name": "oat-transition", "value": "200ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Oat's own progress value width; inherited." }
+    ],
+    "breakpoints": [
+      { "name": "collapse", "value": "720px", "purpose": "Below: single column, bar bleeds to viewport edges, progress row stacks." },
+      { "name": "override-right", "value": "900px", "purpose": "At and above: the free-space override pushes to the right edge of the action bar." },
+      { "name": "page-max", "value": "1100px", "purpose": "Workbench max-width." }
+    ],
+    "layout": { "rail": "320px", "preview": "368px", "queueMaxHeight": "420px", "logMaxHeight": "260px", "rangeWidth": "180px" }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The leading verb: Connect before connection, Send in the action bar. Label carries eligibility.",
+      "html": "<button class=\"ds-btn-primary\">Send 1 still + 1 animation</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); font-size: var(--text-7); font-weight: var(--font-medium); line-height: var(--leading-normal); white-space: nowrap; background-color: var(--primary); color: var(--primary-foreground); border-radius: var(--radius-medium); border: 1px solid; border-color: rgb(255 255 255 / 0.15) rgb(0 0 0 / 0.2) rgb(0 0 0 / 0.2) rgb(255 255 255 / 0.15); cursor: pointer; transition: background-color var(--transition-fast), transform var(--transition-fast); } .ds-btn-primary:hover:not(:disabled) { background-color: color-mix(in srgb, var(--primary), white 25%); } .ds-btn-primary:active:not(:disabled) { transform: translate(1px, 1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: .6; cursor: default; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every non-leading verb: Disconnect, Add pictures, Send as animation.",
+      "html": "<button class=\"ds-btn-secondary\">Add pictures…</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); font-size: var(--text-7); font-weight: var(--font-medium); line-height: var(--leading-normal); white-space: nowrap; background-color: var(--secondary); color: var(--secondary-foreground); border-radius: var(--radius-medium); border: 1px solid; border-color: rgb(255 255 255 / 0.5) rgb(0 0 0 / 0.1) rgb(0 0 0 / 0.1) rgb(255 255 255 / 0.5); cursor: pointer; transition: background-color var(--transition-fast), transform var(--transition-fast); } .ds-btn-secondary:hover { background-color: color-mix(in srgb, var(--secondary), black 10%); } .ds-btn-secondary:active { transform: translate(1px, 1px); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Secondary Button",
+      "kind": "button",
+      "refersTo": "button-outline-secondary",
+      "description": "Small utility verbs beside a control: reset, clear.",
+      "html": "<button class=\"ds-btn-outline\">reset</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; padding: var(--space-2) var(--space-4); font-size: var(--text-7); font-weight: var(--font-medium); line-height: var(--leading-normal); background-color: transparent; color: var(--secondary-foreground); border: 1px solid var(--secondary); border-radius: var(--radius-medium); cursor: pointer; transition: background-color var(--transition-fast); } .ds-btn-outline:hover { background-color: color-mix(in srgb, var(--secondary), transparent 80%); } .ds-btn-outline:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Remove Button",
+      "kind": "button",
+      "refersTo": "button-ghost-danger",
+      "description": "Quiet at rest (muted ink), danger only on hover or focus. The queue-row remove x.",
+      "html": "<button class=\"ds-btn-remove\" aria-label=\"remove\"><svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><path d=\"M4 4l8 8M12 4l-8 8\"/></svg></button>",
+      "css": ".ds-btn-remove { display: inline-flex; align-items: center; justify-content: center; padding: var(--space-1) var(--space-2); background: transparent; border: 1px solid transparent; border-radius: var(--radius-medium); color: var(--muted-foreground); cursor: pointer; transition: background-color var(--transition-fast), color var(--transition-fast); } .ds-btn-remove:hover, .ds-btn-remove:focus-visible { color: var(--danger); background-color: color-mix(in srgb, var(--danger), transparent 90%); } .ds-btn-remove:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "tag-secondary",
+      "description": "Oat .badge in secondary: 'sent' beside a queue name, 'showing encoded JPEG' under the preview. Informational, never decorative.",
+      "html": "<span class=\"ds-tag\">sent</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); font-size: var(--text-8); font-weight: var(--font-medium); line-height: var(--leading-normal); white-space: nowrap; background-color: var(--secondary); color: var(--secondary-foreground); border-radius: var(--radius-full); }"
+    },
+    {
+      "name": "Storage Gauge",
+      "kind": "custom",
+      "refersTo": "meter",
+      "description": "The one colour that moves: label, mono tabular caption, Oat meter whose bands go success / warning past 90% / danger when the queue would overflow.",
+      "html": "<div class=\"ds-gauge\"><div class=\"ds-gauge-head\"><span class=\"ds-gauge-title\">Badge storage</span><span class=\"ds-gauge-caption\">11260 KB used · 150 KB queued · 4974 KB free</span></div><meter class=\"ds-gauge-meter\" min=\"0\" max=\"16384\" low=\"1\" high=\"14745\" optimum=\"8192\" value=\"11410\"></meter></div>",
+      "css": ".ds-gauge { display: grid; gap: var(--space-2); font-family: var(--font-sans); } .ds-gauge-head { display: grid; gap: var(--space-1); font-size: var(--text-7); } .ds-gauge-title { font-weight: var(--font-semibold); } .ds-gauge-caption { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-8); color: var(--muted-foreground); } .ds-gauge.over .ds-gauge-caption { color: var(--danger); font-weight: var(--font-semibold); } .ds-gauge-meter { appearance: none; width: 100%; height: 0.75rem; border: none; border-radius: var(--radius-full); overflow: hidden; background: var(--muted); } .ds-gauge-meter::-webkit-meter-bar { background: var(--muted); border: none; border-radius: var(--radius-full); height: 0.75rem; } .ds-gauge-meter::-webkit-meter-optimum-value { background: var(--success); border-radius: var(--radius-full); transition: width 240ms cubic-bezier(.2,.8,.2,1); } .ds-gauge-meter::-webkit-meter-suboptimum-value { background: var(--warning); border-radius: var(--radius-full); transition: width 240ms cubic-bezier(.2,.8,.2,1); } .ds-gauge-meter::-webkit-meter-even-less-good-value { background: var(--danger); border-radius: var(--radius-full); transition: width 240ms cubic-bezier(.2,.8,.2,1); } @media (prefers-reduced-motion: reduce) { .ds-gauge-meter::-webkit-meter-optimum-value, .ds-gauge-meter::-webkit-meter-suboptimum-value, .ds-gauge-meter::-webkit-meter-even-less-good-value { transition: none; } }"
+    },
+    {
+      "name": "Queue Row",
+      "kind": "card",
+      "refersTo": "queue-row",
+      "description": "44px round thumb on panel black, ellipsised name with optional tag, mono meta, ghost remove. Hover: hairline; selected: ring border and accent wash.",
+      "html": "<ul class=\"ds-entries\"><li class=\"ds-entry ds-entry-selected\"><span class=\"ds-thumb\"></span><span class=\"ds-name\">photo.gif <span class=\"ds-tag\">8 frames · 210 ms</span></span><span class=\"ds-meta\">126.1 KB · q0.70</span><button class=\"ds-btn-remove\" aria-label=\"remove\"><svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><path d=\"M4 4l8 8M12 4l-8 8\"/></svg></button></li><li class=\"ds-entry\"><span class=\"ds-thumb\"></span><span class=\"ds-name\">photo2.jpg</span><span class=\"ds-meta\">22.5 KB · q0.70</span><button class=\"ds-btn-remove\" aria-label=\"remove\"><svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><path d=\"M4 4l8 8M12 4l-8 8\"/></svg></button></li></ul>",
+      "css": ".ds-entries { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; width: 320px; font-family: var(--font-sans); } .ds-entry { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 0 var(--space-3); align-items: center; padding: var(--space-1) var(--space-2); border-radius: var(--radius-medium); border: 1px solid transparent; cursor: pointer; } .ds-entry:hover { border-color: var(--border); } .ds-entry-selected { border-color: var(--ring); background: var(--accent); } .ds-thumb { grid-column: 1; grid-row: 1 / span 2; width: 44px; height: 44px; border-radius: var(--radius-full); background: #000; } .ds-name { grid-column: 2; grid-row: 1; font-size: var(--text-7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--foreground); } .ds-meta { grid-column: 2; grid-row: 2; font-size: var(--text-8); font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted-foreground); } .ds-entry .ds-btn-remove { grid-column: 3; grid-row: 1 / span 2; } .ds-tag { display: inline-flex; align-items: center; padding: var(--space-1) var(--space-2); font-size: var(--text-8); font-weight: var(--font-medium); background-color: var(--secondary); color: var(--secondary-foreground); border-radius: var(--radius-full); } .ds-btn-remove { display: inline-flex; padding: var(--space-1) var(--space-2); background: transparent; border: 1px solid transparent; border-radius: var(--radius-medium); color: var(--muted-foreground); cursor: pointer; } .ds-btn-remove:hover, .ds-btn-remove:focus-visible { color: var(--danger); }"
+    },
+    {
+      "name": "Preview Stage",
+      "kind": "custom",
+      "refersTo": "preview-stage",
+      "description": "The badge's panel at real pixel size: a 368px circle on panel black, dashed hairline ring when empty, solid once a picture is loaded.",
+      "html": "<div class=\"ds-drop\" tabindex=\"0\"><span class=\"ds-drop-hint\">add a picture to start</span></div>",
+      "css": ".ds-drop { display: grid; place-items: center; width: 368px; height: 368px; max-width: 100%; aspect-ratio: 1; border-radius: 50%; border: 2px dashed var(--border); overflow: hidden; background: #000; } .ds-drop.loaded { border-style: solid; cursor: grab; } .ds-drop.grabbing { cursor: grabbing; } .ds-drop:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; } .ds-drop-hint { color: var(--muted-foreground); text-align: center; padding: var(--space-4); font-size: var(--text-7); font-family: var(--font-sans); }"
+    },
+    {
+      "name": "Action Bar",
+      "kind": "nav",
+      "refersTo": "action-bar",
+      "description": "The one framed surface: card on hairline, sticky to the viewport bottom with the bar-lift shadow. Send leads; progress and a tabular status line beneath.",
+      "html": "<div class=\"ds-bar\"><div class=\"ds-bar-actions\"><button class=\"ds-btn-primary\">Send 2 stills</button><button class=\"ds-btn-secondary\">Send 2 as one animation</button><label class=\"ds-bar-label\">frame time <output class=\"ds-bar-output\">1.0 s</output></label><label class=\"ds-bar-override\"><input type=\"checkbox\"> ignore free-space check</label></div><div class=\"ds-bar-progress\"><progress class=\"ds-progress\" max=\"1\" value=\"0.4\"></progress><span class=\"ds-bar-text\">1/2 packets · 18.0 KB of 40.5 KB</span></div></div>",
+      "css": ".ds-bar { display: grid; gap: var(--space-2); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-medium); padding: var(--space-3) var(--space-4); box-shadow: 0 -6px 18px -12px rgb(0 0 0 / .35); font-family: var(--font-sans); } .ds-bar-actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; } .ds-bar-label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); } .ds-bar-output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 2.6em; } .ds-bar-override { font-size: var(--text-7); margin-inline-start: auto; } .ds-bar-progress { display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: var(--space-4); } .ds-progress { appearance: none; width: 100%; height: var(--bar-height); border: none; border-radius: var(--radius-full); overflow: hidden; background: var(--muted); } .ds-progress::-webkit-progress-bar { background: var(--muted); border-radius: var(--radius-full); } .ds-progress::-webkit-progress-value { background: var(--primary); border-radius: var(--radius-full); transition: width var(--transition); } .ds-bar-text { font-size: var(--text-7); font-variant-numeric: tabular-nums; text-align: end; color: var(--muted-foreground); } .ds-btn-primary { display: inline-flex; padding: var(--space-2) var(--space-4); font-size: var(--text-7); font-weight: var(--font-medium); background-color: var(--primary); color: var(--primary-foreground); border-radius: var(--radius-medium); border: 1px solid; border-color: rgb(255 255 255 / 0.15) rgb(0 0 0 / 0.2) rgb(0 0 0 / 0.2) rgb(255 255 255 / 0.15); cursor: pointer; } .ds-btn-primary:hover { background-color: color-mix(in srgb, var(--primary), white 25%); } .ds-btn-secondary { display: inline-flex; padding: var(--space-2) var(--space-4); font-size: var(--text-7); font-weight: var(--font-medium); background-color: var(--secondary); color: var(--secondary-foreground); border-radius: var(--radius-medium); border: 1px solid; border-color: rgb(255 255 255 / 0.5) rgb(0 0 0 / 0.1) rgb(0 0 0 / 0.1) rgb(255 255 255 / 0.5); cursor: pointer; } .ds-btn-secondary:hover { background-color: color-mix(in srgb, var(--secondary), black 10%); }"
+    },
+    {
+      "name": "Debug Drawer",
+      "kind": "custom",
+      "refersTo": "log-pane",
+      "description": "Oat details accordion, closed by default and opened only by hand; the log pane is muted mono at 1.35 line-height.",
+      "html": "<details class=\"ds-drawer\"><summary class=\"ds-drawer-summary\"><span>debug log <span class=\"ds-drawer-sub\">raw frames and packets</span></span></summary><pre class=\"ds-log\">&gt; 55 AA 02 01 68 65 6C 6C 6F\n&lt; 55 AA 02 02 00</pre></details>",
+      "css": ".ds-drawer { border: 1px solid var(--border); border-radius: var(--radius-medium); overflow: hidden; font-family: var(--font-sans); } .ds-drawer-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-4); font-size: var(--text-7); font-weight: var(--font-medium); color: var(--muted-foreground); cursor: pointer; user-select: none; list-style: none; transition: background-color var(--transition-fast); } .ds-drawer-summary::-webkit-details-marker { display: none; } .ds-drawer-summary:hover { background-color: var(--muted); } .ds-drawer-summary::after { content: ''; width: 1em; height: 1em; background-color: currentColor; mask-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\"); mask-size: contain; mask-repeat: no-repeat; transition: transform var(--transition-fast); } .ds-drawer[open] .ds-drawer-summary { border-bottom: 1px solid var(--border); } .ds-drawer[open] .ds-drawer-summary::after { transform: rotate(180deg); } .ds-drawer-sub { margin-inline-start: var(--space-2); color: var(--faint-foreground); } .ds-log { margin: var(--space-4); max-height: 260px; overflow: auto; font-size: var(--text-8); line-height: 1.35; font-family: var(--font-mono); background: var(--muted); padding: var(--space-3); border-radius: var(--radius-medium); white-space: pre-wrap; word-break: break-all; color: var(--foreground); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lit Workbench",
+    "overview": "badge squirt is a hardware workbench, not a form. The badge and its storage sit on the left, the picture sits on the stage, one bar of verbs runs along the bottom. It refuses the stack of same-size cards: there is exactly one framed surface on the page (the action bar) and it is framed because it is sticky and has to read as a surface when it floats over the page. Everything else is separated by hairline dividers and whitespace, so the rail reads as one column of hardware facts rather than a pile of widgets.\n\nColour follows the system. Oat's light-dark() neutrals mean the page is light on a light desk and dark on a dark one, and the scene is a lit desk with a badge in hand, so the app never forces dark. Chroma is rationed: one primary for the leading verb, and one <meter> whose fill is the only colour that moves. Every measurement (KB, px, ms, frames, seconds, quality) is set in tabular monospace so numbers line up and never jitter as they change.\n\nDensity is workbench density: 14 px UI text, 12 px numerals, quarter-rem row gaps in the queue, and the round preview at the badge's real pixel size (368 px) so the crop on screen is the crop the badge shows.",
+    "keyCharacteristics": [
+      "Two-region grid (320 px rail + fluid stage) with a full-width sticky action bar and a closed drawer beneath; single column under 720 px.",
+      "Oat's palette as shipped; no project colours beyond the badge panel's black.",
+      "Hairline (1 px border) dividers between rail sections; borders, not cards, do the separating.",
+      "Tabular monospace for every number the hardware or the encoder reports.",
+      "The storage <meter> is the only element whose colour changes with state.",
+      "One authored transition (the meter fill), honouring prefers-reduced-motion."
+    ],
+    "rules": [
+      { "name": "The One Colour That Moves Rule", "body": "The storage <meter> is the only element on the page whose colour changes with state (success → warning past 90 % → danger when the queue would overflow). No other element animates or shifts hue to signal state; text says it instead.", "section": "colors" },
+      { "name": "The Quiet Danger Rule", "body": "Danger is latent, not resting. The remove button is muted-foreground at rest and turns danger only on hover or focus; Abort is a ghost danger button and is hidden until an upload is running.", "section": "colors" },
+      { "name": "The Leading Verb Rule", "body": "At most one primary-filled button per region. When Connect succeeds it demotes itself to secondary so Send is the only primary on the page.", "section": "colors" },
+      { "name": "The Tabular Mono Numeral Rule", "body": "Every measurement the hardware or the encoder reports (KB, px, ms, frames, seconds, q-values, hex IDs) is set in --font-mono with font-variant-numeric: tabular-nums. Numbers that change must not shift their neighbours; the slider <output>s reserve min-width: 2.6em and the readout row reserves min-height: 1.6em for the same reason.", "section": "typography" },
+      { "name": "The One Heading Rule", "body": "The wordmark is the only heading. Rail sections are titled with a semibold --text-7 span, not an <h2>, so the rail reads as labelled facts, not a document.", "section": "typography" },
+      { "name": "The Hairline Rule", "body": "Separation is a 1 px border line or whitespace. Do not introduce a card to separate content; the action bar is framed because it floats, and it is the only one.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Oat's variables for every colour, size and radius; the project stylesheet introduces no new tokens except --rail and the badge's panel-black.",
+      "Do set every measurement in --font-mono with tabular-nums, and reserve width or height where a number will change so neighbours never shift.",
+      "Do separate rail sections with a 1 px border hairline and --space-4 top padding, not a card.",
+      "Do keep the preview at the badge's reported pixel size (368 px) and round; what you see is what the badge gets.",
+      "Do let the <meter> carry state colour through its own low/high/optimum bands and put the exact numbers in the caption beside it.",
+      "Do honour prefers-reduced-motion on any transition you add; the meter fill already does.",
+      "Do put the eligibility of a verb in its label and the reason it is disabled in its title."
+    ],
+    "donts": [
+      "Don't force dark mode or add a theme toggle; the page follows the system via Oat's light-dark() neutrals.",
+      "Don't animate or recolour anything other than the storage meter to signal state; text does that job.",
+      "Don't add a second primary-filled button to a region; demote the previous leading verb to secondary instead.",
+      "Don't stack cards. The action bar is the only framed panel, and it is framed because it floats.",
+      "Don't add shadows beyond the bar lift, and never a hard or offset shadow.",
+      "Don't use danger at rest on a control; danger appears on hover, focus, or while an operation is running.",
+      "Don't add headings inside the rail; section titles are semibold --text-7 spans."
+    ]
+  }
+}

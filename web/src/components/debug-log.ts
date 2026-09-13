@@ -17,7 +17,6 @@ export class DebugLog extends HTMLElement {
   connectedCallback(): void {
     this.innerHTML = `
       <div class="hstack">
-        <strong>debug</strong>
         <button type="button" class="clear outline" data-variant="secondary">clear</button>
         <label><input type="checkbox" class="acks" checked> hide per-packet acks</label>
       </div>

@@ -24,6 +24,8 @@ export interface ImageEntry {
   view: View;
   quality: number;
   prepared: PreparedImage | null;
+  /** True once these exact bytes went to the badge; any re-encode clears it. Drives the gauge. */
+  sent: boolean;
 }
 
 /** True when the entry came from an animated file. */
@@ -66,6 +68,7 @@ export class ImageStore extends EventTarget {
       view: { ...IDENTITY_VIEW },
       quality: DEFAULT_QUALITY,
       prepared: null,
+      sent: false,
     };
     this.entries.push(entry);
     this.emit("change", this.entries);
@@ -95,8 +98,22 @@ export class ImageStore extends EventTarget {
     const prepared = await prepareImage(entry.frames, width, height, entry.quality, entry.view);
     if (entry.prepared) URL.revokeObjectURL(entry.prepared.previewUrl);
     entry.prepared = prepared;
+    entry.sent = false;
     this.emit("update", entry);
     return prepared;
+  }
+
+  /** Called by the uploader after a successful send so the gauge moves bytes from queued to used. */
+  markSent(entries: ImageEntry[]): void {
+    for (const e of entries) {
+      e.sent = true;
+      this.emit("update", e);
+    }
+  }
+
+  /** Encoded entries not yet on the badge, in list order. */
+  get queued(): ImageEntry[] {
+    return this.entries.filter((e) => e.prepared && !e.sent);
   }
 
   /** Entries that have an encode ready, in list order. */

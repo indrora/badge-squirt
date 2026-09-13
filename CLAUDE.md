@@ -3,6 +3,11 @@
 **Read `STYLE.md` first. It is binding.** Then `doc/dzbj-badge-ble-protocol.md` for the
 wire protocol (sections marked verified were observed on real hardware).
 
+Design: `PRODUCT.md` (product truth), `DESIGN.md` (how the web app uses Oat: grid, rail,
+gauge semantics, mono-numeral and one-colour rules), `doc/shape-workbench.md` (the confirmed
+brief the current page implements). The page carries its direction contract as the first
+comment in `<body>`; keep it true when you change the layout.
+
 Quick map:
 
 * `py_tool/dzbj.py` — reference BLE client (`uv run py_tool/dzbj.py add misc/sniffit.jpg`).
@@ -12,6 +17,9 @@ Quick map:
   change to the Python packer; the TS tests are only as honest as that file.
 * `web/` — `npm test` (tsc + node:test), `npm run dev` (build + `serve` on :8080, open
   http://localhost:8080 in Chrome). Web Bluetooth needs a user gesture and localhost/https.
+  `npm run demo-assets` copies sample pictures under web/ (ignored) and `?demo` on the URL
+  fakes a connected badge with them loaded; `npm run shoot` captures desktop/mobile/800 px
+  PNGs of that state into `.impeccable/review/` with the installed Edge/Chrome.
 
 Hardware facts that bit us (details in the doc):
 

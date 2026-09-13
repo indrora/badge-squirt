@@ -9,11 +9,14 @@
     "watch": "tsc -p tsconfig.json --watch",
     "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js",
     "serve": "serve -l 8080 .",
-    "dev": "npm run build && npm run serve"
+    "dev": "npm run build && npm run serve",
+    "demo-assets": "cp ../misc/sniffit.jpg _test.jpg && cp ../misc/imin.jpg _test2.jpg && cp ../misc/squirtle1.gif _test.gif",
+    "shoot": "node scripts/shoot.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/web-bluetooth": "^0.0.21",
+    "puppeteer-core": "^25.10.0",
     "serve": "^14.2.4",
     "typescript": "^5.6.0"
   },

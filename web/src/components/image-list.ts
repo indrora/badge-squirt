@@ -1,18 +1,21 @@
 /**
- * <image-list> — the stack of pictures: add (file picker, multiple), select, remove.
+ * <image-list> — the queue in the hardware rail: add (file picker, multiple), select, remove.
  *
  * Each row shows the encoded thumbnail (so it reflects crop and quality), the file name
  * and the encoded size; an animated entry (GIF) also shows its frame count and native
- * frame time. Clicking a row selects it in the store; the editor follows the store's
+ * frame time, and an entry that has already gone to the badge is marked "sent" until it
+ * is re-encoded. Clicking a row selects it in the store; the editor follows the store's
  * "select" event. Drop and paste anywhere on the page also add pictures — that is wired
  * here because "add" is this component's job, wherever the gesture lands.
  *
  * Markup follows Oat (oat.ink): plain <button>s with data-variant, `.hstack`, `.badge`,
- * `ul.unstyled`; only the row grid is ours (index.html).
+ * `ul.unstyled`; the remove control is an authored SVG, not a glyph.
  */
 
 import { formatBytes } from "../image.js";
 import { isAnimated, nativeIntervalMs, type ImageEntry, type ImageStore } from "../model.js";
+
+const REMOVE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>`;
 
 export class ImageList extends HTMLElement {
   private store: ImageStore | null = null;
@@ -22,12 +25,13 @@ export class ImageList extends HTMLElement {
 
   connectedCallback(): void {
     this.innerHTML = `
-      <div class="hstack">
-        <button type="button" class="add">Add pictures…</button>
+      <div class="hstack justify-between">
+        <span class="rail-title">Queue</span>
+        <button type="button" class="add" data-variant="secondary">Add pictures…</button>
         <input type="file" accept="image/*" multiple hidden>
-        <span class="text-light hint">or drop / paste images anywhere · GIFs keep their frames</span>
       </div>
-      <ul class="entries unstyled mt-4"></ul>`;
+      <p class="text-light hint">Drop or paste images anywhere. GIFs keep their frames.</p>
+      <ul class="entries unstyled"></ul>`;
     this.list = this.querySelector("ul")!;
     this.input = this.querySelector("input")!;
     this.querySelector(".add")!.addEventListener("click", () => this.input.click());
@@ -72,15 +76,27 @@ export class ImageList extends HTMLElement {
   private row(entry: ImageEntry): HTMLLIElement {
     const li = document.createElement("li");
     li.dataset["id"] = String(entry.id);
+    li.tabIndex = 0;
+    li.setAttribute("role", "option");
+    li.setAttribute("aria-selected", String(entry === this.store!.selected));
     li.classList.toggle("selected", entry === this.store!.selected);
     li.innerHTML = `
-      <img class="thumb" alt="">
+      <img class="thumb" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
       <span class="name"></span>
       <span class="meta text-light"></span>
-      <button type="button" class="remove ghost" data-variant="danger" title="remove">✕</button>`;
+      <button type="button" class="remove ghost" aria-label="remove">${REMOVE_ICON}</button>`;
     li.addEventListener("click", (e) => {
       if ((e.target as HTMLElement).closest(".remove")) this.store!.remove(entry);
       else this.store!.select(entry);
+    });
+    li.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.store!.select(entry);
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        this.store!.remove(entry);
+      }
     });
     this.fill(li, entry);
     return li;
@@ -94,13 +110,9 @@ export class ImageList extends HTMLElement {
   private fill(li: HTMLLIElement, entry: ImageEntry): void {
     const name = li.querySelector<HTMLElement>(".name")!;
     name.textContent = entry.name;
-    if (isAnimated(entry)) {
-      const tag = document.createElement("span");
-      tag.className = "badge";
-      tag.dataset["variant"] = "secondary";
-      tag.textContent = `${entry.frames.length} frames · ${nativeIntervalMs(entry)} ms`;
-      name.append(" ", tag);
-    }
+    name.title = entry.name;
+    if (isAnimated(entry)) name.append(" ", badge(`${entry.frames.length} frames · ${nativeIntervalMs(entry)} ms`, "secondary"));
+    if (entry.sent) name.append(" ", badge("sent", "secondary"));
     const img = li.querySelector<HTMLImageElement>(".thumb")!;
     const meta = li.querySelector<HTMLElement>(".meta")!;
     if (entry.prepared) {
@@ -110,6 +122,14 @@ export class ImageList extends HTMLElement {
       meta.textContent = "encoding…";
     }
   }
+}
+
+function badge(text: string, variant: string): HTMLSpanElement {
+  const tag = document.createElement("span");
+  tag.className = "badge";
+  tag.dataset["variant"] = variant;
+  tag.textContent = text;
+  return tag;
 }
 
 customElements.define("image-list", ImageList);

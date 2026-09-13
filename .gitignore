@@ -9,3 +9,6 @@ playwright-report/
 __pycache__/
 .impeccable/*.json
 .impeccable/questions/
+web/_test*
+.impeccable/review/
+!.impeccable/design.json

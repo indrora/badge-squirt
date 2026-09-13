@@ -4,61 +4,148 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>badge squirt</title>
+  <link rel="icon" href="data:,">
   <!-- Oat (oat.ink): semantic, classless-ish UI kit. npm dependency served from node_modules;
        the Pages workflow copies these two files to the same path. -->
   <link rel="stylesheet" href="node_modules/@knadh/oat/oat.min.css">
   <script src="node_modules/@knadh/oat/oat.min.js" defer></script>
   <style>
-    /* Only what Oat doesn't cover: the round preview, list rows, the debug log. Theme
-       colours come from Oat's variables so light/dark follow the system automatically. */
-    main.container { max-width: 760px; padding-block: var(--space-6) var(--space-12); display: grid; gap: var(--space-4); }
-    h1 { margin: 0; font-size: var(--text-3); }
-    h1 small { color: var(--muted-foreground); font-weight: var(--font-normal); font-size: var(--text-7); margin-inline-start: var(--space-2); }
-    h3 { margin: 0; font-size: var(--text-5); }
+    /* Only what Oat doesn't cover: the workbench grid, the round preview, list rows, the
+       gauge, the debug drawer. Colours are Oat's variables so light/dark follow the system;
+       the scene is a lit desk with a badge in hand, so we do not force dark. */
+    :root { --rail: 320px; }
+    body { min-height: 100dvh; }
+    ::selection { background: var(--primary); color: var(--primary-foreground); }
+    * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     [hidden] { display: none !important; }
-    .bad { color: var(--danger); font-weight: var(--font-semibold); }
+    code { font-family: var(--font-mono); font-size: 0.9em; }
+
+    .workbench {
+      max-width: 1100px; margin-inline: auto; padding: var(--space-4) var(--space-4) 0;
+      display: grid; gap: var(--space-4);
+      grid-template-columns: var(--rail) minmax(0, 1fr);
+      grid-template-areas: "head head" "rail stage" "bar bar" "drawer drawer" "foot foot";
+    }
+    .head { grid-area: head; display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+    .head h1 { margin: 0; font-size: var(--text-3); letter-spacing: -0.01em; }
+    .head p { margin: 0; color: var(--muted-foreground); font-size: var(--text-7); }
+    .rail { grid-area: rail; display: grid; gap: var(--space-6); align-content: start; }
+    .stage { grid-area: stage; display: grid; align-content: start; justify-items: center; padding-top: var(--space-4); }
+    .bar { grid-area: bar; position: sticky; bottom: 0; z-index: 2; background: var(--card); border: 1px solid var(--border);
+           border-radius: var(--radius-medium); padding: var(--space-3) var(--space-4); box-shadow: 0 -6px 18px -12px rgb(0 0 0 / .35); }
+    .drawer { grid-area: drawer; }
+    footer { grid-area: foot; color: var(--muted-foreground); font-size: var(--text-8); text-align: center; padding-block: var(--space-4) var(--space-8); }
+    footer a { color: inherit; }
+    @media (max-width: 720px) {
+      .workbench { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "rail" "stage" "bar" "drawer" "foot"; }
+      .bar { border-radius: var(--radius-medium) var(--radius-medium) 0 0; margin-inline: calc(-1 * var(--space-4)); }
+    }
+
+    /* rail sections read as one column of hardware facts: a title, then content */
+    .rail > section { display: grid; gap: var(--space-3); }
+    .rail > section + section { border-top: 1px solid var(--border); padding-top: var(--space-4); }
+    .rail-title, .gauge-head span:first-child { font-size: var(--text-7); font-weight: var(--font-semibold); }
+    .ritual { margin: 0; font-size: var(--text-7); color: var(--muted-foreground); }
     dl.info { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-4); margin: 0; font-size: var(--text-7); }
-    dl.info dt { color: var(--muted-foreground); } dl.info dd { margin: 0; font-family: var(--font-mono); }
-    /* pictures: list beside editor; stacks on narrow screens */
-    .pictures { display: grid; grid-template-columns: minmax(200px, 1fr) auto; gap: var(--space-6); align-items: start; }
-    @media (max-width: 720px) { .pictures { grid-template-columns: 1fr; } }
-    ul.entries { display: grid; gap: var(--space-1); max-height: 440px; overflow: auto; margin: 0; }
-    ul.entries li { display: grid; grid-template-columns: 48px 1fr auto; grid-template-rows: auto auto; gap: 0 var(--space-3); align-items: center;
+    dl.info dt { color: var(--muted-foreground); } dl.info dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    /* gauge: Oat's <meter> carries the colour; the caption carries the numbers */
+    space-gauge { display: grid; gap: var(--space-2); }
+    .gauge-head { display: grid; gap: var(--space-1); font-size: var(--text-7); }
+    .gauge-head .caption { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-8); }
+    space-gauge.over .caption { color: var(--danger); font-weight: var(--font-semibold); }
+    space-gauge meter { --bar-height: 0.75rem; }
+
+    ul.entries { display: grid; gap: var(--space-1); max-height: 420px; overflow: auto; margin: 0; }
+    ul.entries li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 0 var(--space-3); align-items: center;
                     padding: var(--space-1) var(--space-2); border-radius: var(--radius-medium); border: 1px solid transparent; cursor: pointer; }
     ul.entries li:hover { border-color: var(--border); }
     ul.entries li.selected { border-color: var(--ring); background: var(--accent); }
-    ul.entries .thumb { grid-column: 1; grid-row: 1 / span 2; width: 48px; height: 48px; border-radius: var(--radius-full); object-fit: cover; background: #000; }
+    ul.entries .thumb { grid-column: 1; grid-row: 1 / span 2; width: 44px; height: 44px; border-radius: var(--radius-full); object-fit: cover; background: #000; }
     ul.entries .name { grid-column: 2; grid-row: 1; font-size: var(--text-7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    ul.entries .meta { grid-column: 2; grid-row: 2; font-size: var(--text-8); }
-    ul.entries .remove { grid-column: 3; grid-row: 1 / span 2; }
-    /* The panel is round, so the preview is too — you see exactly the crop the badge will show. */
-    .drop { display: grid; place-items: center; width: 368px; height: 368px; max-width: 100%; aspect-ratio: 1; margin: 0 auto;
+    ul.entries .name .badge { padding-inline: var(--space-2); }
+    ul.entries .meta { grid-column: 2; grid-row: 2; font-size: var(--text-8); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    /* remove is quiet at rest (muted, currentColor); danger only when it is about to happen */
+    ul.entries .remove { grid-column: 3; grid-row: 1 / span 2; padding: var(--space-1) var(--space-2); color: var(--muted-foreground); }
+    ul.entries .remove:hover, ul.entries .remove:focus-visible { color: var(--danger); }
+
+    /* stage: the round preview at the badge's real pixel size; you see exactly the crop it will show */
+    .drop { display: grid; place-items: center; width: 368px; height: 368px; max-width: 100%; aspect-ratio: 1;
             border-radius: 50%; border: 2px dashed var(--border); overflow: hidden; background: #000; }
-    .drop.loaded { cursor: grab; touch-action: none; user-select: none; }
+    .drop.loaded { cursor: grab; touch-action: none; user-select: none; border-style: solid; }
     .drop.grabbing { cursor: grabbing; }
     .drop .preview { width: 100%; height: 100%; display: block; }
-    .drop .hint { color: var(--muted-foreground); text-align: center; padding: var(--space-4); }
-    .controls label { display: inline-flex; align-items: center; gap: var(--space-2); }
-    input[type=range] { width: 160px; }
-    .readout-row { min-height: 1.6em; font-size: var(--text-7); } /* reserved line so the sliders never shift */
+    .drop .hint { color: var(--muted-foreground); text-align: center; padding: var(--space-4); font-size: var(--text-7); }
+    image-picker { display: grid; justify-items: center; }
+    .controls label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); }
+    .controls output, .frame-time-label output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 2.6em; }
+    input[type=range] { width: 180px; }
+    .readout-row { min-height: 1.6em; font-size: var(--text-7); justify-content: center; } /* reserved line so the sliders never shift */
+    .readout-row .readout { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-8); }
+
+    /* action bar */
+    upload-progress { display: grid; gap: var(--space-2); }
+    .actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+    .anim-group { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+    .frame-time-label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); }
+    .override { font-size: var(--text-7); }
+    @media (min-width: 900px) { .override { margin-inline-start: auto; } }
+    .progress-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: var(--space-4); }
+    .progress-row .text { margin: 0; font-size: var(--text-7); font-variant-numeric: tabular-nums; text-align: end; }
+    @media (max-width: 720px) { .progress-row { grid-template-columns: 1fr; } .progress-row .text { text-align: start; } }
+
+    /* drawer */
+    /* Oat styles <details>/<summary> as an accordion (chevron, frame); we only size the text */
+    details.drawer summary { font-size: var(--text-7); color: var(--muted-foreground); }
+    details.drawer summary .text-lighter { margin-inline-start: var(--space-2); }
+    debug-log { display: block; margin-top: var(--space-3); }
     pre.log { margin: 0; max-height: 260px; overflow: auto; font-size: var(--text-8); line-height: 1.35; font-family: var(--font-mono);
               background: var(--muted); padding: var(--space-3); border-radius: var(--radius-medium); white-space: pre-wrap; word-break: break-all; }
-    footer { color: var(--muted-foreground); font-size: var(--text-8); text-align: center; } footer a { color: inherit; }
+
+    /* the one authored motion: the storage fill eases to its new length when the queue
+       changes (Chrome-only app, so the WebKit pseudo-elements are the real target) */
+    meter::-webkit-meter-optimum-value, meter::-webkit-meter-suboptimum-value, meter::-webkit-meter-even-less-good-value { transition: width 240ms cubic-bezier(.2,.8,.2,1); }
+    @media (prefers-reduced-motion: reduce) { meter::-webkit-meter-optimum-value, meter::-webkit-meter-suboptimum-value, meter::-webkit-meter-even-less-good-value { transition: none; } }
   </style>
 </head>
 <body>
-  <main class="container">
-    <h1>badge squirt <small>push pictures to a DZBJ- badge over Web Bluetooth</small></h1>
-    <p class="unsupported" role="alert" data-variant="danger" hidden>This browser has no Web Bluetooth. Use Chrome or Edge on https:// or localhost.</p>
-    <section class="card"><badge-connect></badge-connect></section>
-    <section class="card pictures">
-      <image-list></image-list>
+<!--
+THESIS: A hardware workbench, not a form: the badge and its storage on the left, the picture on the stage, one bar of verbs; refuses the stack of same-size cards.
+OWN-WORLD: Oat as shipped (light-dark neutrals, one primary), hairline dividers, tabular mono numerals for every measurement, one <meter> as the only colour that moves.
+STORY: The owner presses the badge, connects, watches the gauge fill as pictures queue, frames the shot on a real-size round preview, sends, and is told the badge never confirms.
+FIRST VIEWPORT: 1100 px: rail 320 px left (ritual copy, Connect, storage gauge, queue); the 368 px round preview centred in the remaining stage; the action bar spans the bottom with Send leading; drawer closed beneath.
+FORM: Device-and-queue workbench, #2 of 7 grounded structures, seed d612eeef (re-roll 1), code-led.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+-->
+  <div class="workbench">
+    <header class="head">
+      <h1>badge squirt</h1>
+      <p>push pictures to a DZBJ- badge over Web Bluetooth</p>
+      <p class="unsupported" role="alert" data-variant="danger" hidden>This browser has no Web Bluetooth. Use Chrome or Edge on https:// or localhost.</p>
+    </header>
+
+    <aside class="rail" aria-label="badge and queue">
+      <section><badge-connect></badge-connect></section>
+      <section><space-gauge></space-gauge></section>
+      <section><image-list></image-list></section>
+    </aside>
+
+    <main class="stage" aria-label="editor">
       <image-picker size="368,368"></image-picker>
-    </section>
-    <section class="card"><upload-progress></upload-progress></section>
-    <section class="card"><debug-log></debug-log></section>
+    </main>
+
+    <div class="bar" role="region" aria-label="send">
+      <upload-progress></upload-progress>
+    </div>
+
+    <details class="drawer">
+      <summary><span>debug log <span class="text-lighter">raw frames and packets</span></span></summary>
+      <debug-log></debug-log>
+    </details>
+
     <footer><a href="https://github.com/indrora/badge-squirt">indrora/badge-squirt</a> <span class="version"></span></footer>
-  </main>
+  </div>
   <script type="module" src="dist/src/main.js"></script>
 </body>
 </html>
