@@ -3,12 +3,14 @@
  * what is free. This is the workbench's focal moment (doc/shape-workbench.md): adding a
  * picture visibly fills the bar, so "will it fit" is answered before anyone presses Send.
  *
- * Two segments by decision: used+queued as one fill, free as the remainder. Colour comes
- * from Oat's <meter> bands: healthy fill is the success colour, past 90% it turns warning,
- * and when the queue would overflow the badge the meter pins at max and goes danger while
- * the caption says by how much. The HTML meter derives those bands from where `optimum`
- * sits relative to `low`/`high`, hence the two placements below. Before a badge is
- * connected there is nothing to measure; the bar sits empty and says so.
+ * Two colours by decision: what is on the badge NOW is a fact and gets a neutral ink fill;
+ * what is QUEUED is the thing about to change and takes the accent (Oat --success), turning
+ * --warning once the total passes 90% and --danger when it would not fit. The queued span
+ * is hatched as well as coloured so colour is never the only code, and it is never drawn
+ * under 6 px when non-zero: at real capacities (16 MB badge, 25 KB pictures) a true-scale
+ * sliver would be invisible, and the whole point of this bar is to see the queue land.
+ * A native <meter> can paint only one fill, so this is a role="meter" div with two spans.
+ * Before a badge is connected there is nothing to measure; the bar sits empty and says so.
  *
  * Numbers: the badge reports allspace/freespace in KB once per connection and never again.
  * "used" is allspace − freespace as reported; after an upload main.ts lowers freespace by
@@ -23,7 +25,9 @@ import type { ImageStore } from "../model.js";
 export class SpaceGauge extends HTMLElement {
   private badge: Badge | null = null;
   private store: ImageStore | null = null;
-  private meter!: HTMLMeterElement;
+  private track!: HTMLElement;
+  private used!: HTMLElement;
+  private queuedSeg!: HTMLElement;
   private caption!: HTMLElement;
 
   connectedCallback(): void {
@@ -32,12 +36,17 @@ export class SpaceGauge extends HTMLElement {
         <h2>Badge storage</h2>
         <span class="caption text-light" aria-live="polite">connect to see space</span>
       </div>
-      <meter min="0" max="1" value="0" aria-label="badge storage used, including queued pictures" aria-hidden="true"></meter>
+      <div class="track" role="meter" aria-label="badge storage" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-hidden="true">
+        <span class="seg used"></span><span class="seg queued"></span>
+      </div>
+      <p class="legend text-light"><span class="key used"></span> on the badge <span class="key queued"></span> queued</p>
       <label class="override" data-variant="danger">
         <input type="checkbox"> send even if it will not fit
         <span class="text-light">the badge may refuse or truncate; use when the report above is wrong</span>
       </label>`;
-    this.meter = this.querySelector("meter")!;
+    this.track = this.querySelector(".track")!;
+    this.used = this.querySelector(".seg.used")!;
+    this.queuedSeg = this.querySelector(".seg.queued")!;
     this.caption = this.querySelector(".caption")!;
     // The override lives with the number it overrides. Whoever sends listens for this.
     this.querySelector<HTMLInputElement>(".override input")!.addEventListener("change", (e) => {
@@ -67,32 +76,35 @@ export class SpaceGauge extends HTMLElement {
     const info = this.badge?.connected ? this.badge.info : null;
     const queued = this.queuedKb;
     if (!info) {
-      this.meter.max = 1;
-      this.meter.value = 0;
-      this.meter.removeAttribute("high");
-      this.meter.setAttribute("aria-hidden", "true"); // "0 of 1" would be a lie; the caption speaks instead
+      this.used.style.width = "0%";
+      this.queuedSeg.style.width = "0%";
+      this.track.setAttribute("aria-hidden", "true"); // nothing to measure; the caption speaks instead
       this.querySelector<HTMLElement>(".override")!.hidden = true; // nothing to override until a badge reports
       this.caption.textContent = queued ? `${queued} KB queued · connect to see space` : "connect to see space";
-      this.classList.remove("over");
+      this.classList.remove("over", "tight");
       return;
     }
     const total = info.allspace ?? info.freespace + Math.max(0, queued);
     const used = total - info.freespace;
     const fill = used + queued;
     const over = fill > total;
-    this.meter.max = total;
-    this.meter.low = 1;
-    this.meter.high = total * 0.9;
-    // optimum in the middle band → middle = green, above `high` = warning (suboptimum);
-    // optimum below `low` → above `high` becomes "even less good" = danger, used for overflow.
-    this.meter.optimum = over ? 0 : total / 2;
-    this.meter.value = Math.min(fill, total);
-    this.meter.removeAttribute("aria-hidden");
+    // Percent widths on the track; the queued span keeps a CSS min-width when non-zero so a
+    // 25 KB picture on a 16 MB badge still lands visibly. The used span yields the space.
+    const usedPct = Math.min(100, (used / total) * 100);
+    const queuedPct = Math.min(100 - usedPct, (queued / total) * 100);
+    this.used.style.width = `${usedPct}%`;
+    this.queuedSeg.style.width = `${queuedPct}%`;
+    this.queuedSeg.classList.toggle("some", queued > 0);
+    this.track.removeAttribute("aria-hidden");
+    this.track.setAttribute("aria-valuemax", String(total));
+    this.track.setAttribute("aria-valuenow", String(Math.min(fill, total)));
+    this.track.setAttribute("aria-valuetext", `${used} KB on the badge, ${queued} KB queued, ${Math.max(0, total - fill)} KB free`);
     this.querySelector<HTMLElement>(".override")!.hidden = false;
     this.classList.toggle("over", over);
+    this.classList.toggle("tight", !over && fill > total * 0.9);
     this.caption.textContent = over
-      ? `${used} KB used · ${queued} KB queued · over by ${fill - total} KB`
-      : `${used} KB used · ${queued} KB queued · ${total - fill} KB free`;
+      ? `${used} KB on the badge · ${queued} KB queued · over by ${fill - total} KB`
+      : `${used} KB on the badge · ${queued} KB queued · ${total - fill} KB free`;
   }
 }
 

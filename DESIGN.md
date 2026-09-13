@@ -1,6 +1,6 @@
 ---
 name: badge squirt
-description: A hardware workbench for pushing pictures to a round BLE badge; Oat as shipped, one meter as the only colour that moves.
+description: A hardware workbench for pushing pictures to a round BLE badge; Oat as shipped, one two-tone storage bar as the only colour that moves.
 colors:
   background: "light-dark(#fff, #09090b)"
   foreground: "light-dark(#09090b, #fafafa)"
@@ -161,8 +161,8 @@ the badge shows.
 - Oat's palette as shipped; no project colours beyond the badge panel's black.
 - Hairline (1 px `border`) dividers between rail sections; borders, not cards, do the separating.
 - Tabular monospace for every number the hardware or the encoder reports.
-- The storage `<meter>` is the only element whose colour changes with state.
-- One authored transition (the meter fill), honouring `prefers-reduced-motion`.
+- The storage bar's queued span is the only element whose colour changes with state.
+- One authored transition (the storage bar's spans), honouring `prefers-reduced-motion`.
 
 ## Colors
 
@@ -201,7 +201,7 @@ the hardware state demands them.
   ghost button; the no-Web-Bluetooth alert. Never decorative.
 
 ### Named Rules
-**The One Colour That Moves Rule.** The storage `<meter>` is the only element on the page whose
+**The One Colour That Moves Rule.** The storage bar's queued span is the only element on the page whose
 colour changes with state (success → warning past 90 % → danger when the queue would overflow).
 No other element animates or shifts hue to signal state; text says it instead.
 
@@ -320,14 +320,18 @@ Oat's buttons unchanged; the project only chooses variants.
   press, and the project's 2 px `ring` outline offset 2 px on `:focus-visible`.
 
 ### Storage Gauge (signature)
-An Oat `<meter>` at `--bar-height: 0.75rem` under a two-line head: "Badge storage" as a label and a
-mono tabular caption ("11260 KB used · 150 KB queued · 4974 KB free"). Two segments by decision:
-used+queued as one fill against free. Bands come from the meter's own `low`/`high`/`optimum`
-placement: healthy fill is `success`, past 90 % is `warning`, and when the queue would overflow the
-badge the meter pins at max, goes `danger`, and the caption turns `danger` semibold and says by how
-much. Before connection the bar is empty and the caption says "connect to see space". The fill
-eases over 240 ms (`cubic-bezier(.2,.8,.2,1)`), the page's only authored motion, and is disabled
-under `prefers-reduced-motion`.
+A `role="meter"` track (0.75 rem, full radius, `muted` ground) carrying two spans, under a two-line
+head: "Badge storage" as an `h2` and a mono tabular caption ("11260 KB on the badge · 150 KB queued
+· 4974 KB free"). Two colours by decision (2026-09-13): what is on the badge **now** is a fact and
+fills in `muted-foreground`; what is **queued** is the thing about to change and takes the accent
+`--queued`, which is `success` when healthy, `warning` once used+queued passes 90 %, and `danger`
+when it would not fit (the caption then turns `danger` semibold and says by how much). The queued
+span is hatched (`repeating-linear-gradient` 135°, 4 px on / 4 px at 55 %) so colour is never the
+only code, and keeps `min-width: 6px` whenever non-zero, because at real capacities a true-scale
+25 KB sliver on a 16 MB bar would be invisible. A legend under the track names both keys. Before
+connection both spans are 0 and the caption says "connect to see space". Both spans ease their
+width over 240 ms (`cubic-bezier(.2,.8,.2,1)`), the page's only authored motion, disabled under
+`prefers-reduced-motion`; on send, queued collapses as used grows.
 
 ### Queue Rows
 A `44px minmax(0,1fr) auto` grid per row: round thumbnail on `panel-black`, name on the first line
