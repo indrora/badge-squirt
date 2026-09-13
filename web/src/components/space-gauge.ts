@@ -71,6 +71,7 @@ export class SpaceGauge extends HTMLElement {
       this.meter.value = 0;
       this.meter.removeAttribute("high");
       this.meter.setAttribute("aria-hidden", "true"); // "0 of 1" would be a lie; the caption speaks instead
+      this.querySelector<HTMLElement>(".override")!.hidden = true; // nothing to override until a badge reports
       this.caption.textContent = queued ? `${queued} KB queued · connect to see space` : "connect to see space";
       this.classList.remove("over");
       return;
@@ -87,6 +88,7 @@ export class SpaceGauge extends HTMLElement {
     this.meter.optimum = over ? 0 : total / 2;
     this.meter.value = Math.min(fill, total);
     this.meter.removeAttribute("aria-hidden");
+    this.querySelector<HTMLElement>(".override")!.hidden = false;
     this.classList.toggle("over", over);
     this.caption.textContent = over
       ? `${used} KB used · ${queued} KB queued · over by ${fill - total} KB`

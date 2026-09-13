@@ -45,7 +45,12 @@ export class BadgeConnect extends HTMLElement {
   attach(badge: Badge): void {
     this.badge = badge;
     badge.on("info", (e) => this.showInfo(e.detail));
-    badge.on("disconnected", () => this.setState(false));
+    badge.on("disconnected", () => {
+      // Mid-session drops are normal for this hardware (idle timer, walked away). Say so,
+      // and the ritual copy returns beside Connect via setState.
+      this.setState(false);
+      this.status.textContent = "the badge disconnected — press its button, then Connect again";
+    });
   }
 
   private async toggle(): Promise<void> {

@@ -93,6 +93,10 @@
     .drop.grabbing { cursor: grabbing; }
     .drop .preview { width: 100%; height: 100%; display: block; }
     .drop .hint { color: var(--muted-foreground); text-align: center; padding: var(--space-4); font-size: var(--text-7); }
+    /* the empty ring is the onboarding: three steps, live one bright, done ones struck */
+    .drop ol.steps { text-align: start; margin: 0; padding: 0 0 0 1.4em; display: grid; gap: var(--space-2); max-width: 15em; }
+    .drop ol.steps li.live { color: var(--foreground); font-weight: var(--font-semibold); }
+    .drop ol.steps li.done { text-decoration: line-through; color: var(--faint-foreground); }
     image-picker { display: grid; justify-items: center; }
     .controls label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); }
     .controls output, .frame-time-label output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 2.6em; }

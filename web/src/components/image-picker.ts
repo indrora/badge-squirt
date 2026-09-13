@@ -23,7 +23,7 @@ import type { ImageEntry, ImageStore } from "../model.js";
 const ENCODE_DEBOUNCE_MS = 120;
 
 export class ImagePicker extends HTMLElement {
-  static observedAttributes = ["size"];
+  static observedAttributes = ["size", "connected"];
   private store: ImageStore | null = null;
   private entry: ImageEntry | null = null;
   private encodeTimer = 0;
@@ -48,7 +48,11 @@ export class ImagePicker extends HTMLElement {
       <div class="drop" tabindex="0" role="group" aria-label="framing: drag or arrow keys to pan, wheel or plus and minus to zoom, 0 to reset"
            aria-describedby="ring-status">
         <canvas class="preview" hidden aria-label="encoded preview"></canvas>
-        <span class="hint">add a picture to start</span>
+        <ol class="hint steps" aria-label="how to start">
+          <li data-step="press">press the button on the badge</li>
+          <li data-step="connect">Connect, within a few seconds</li>
+          <li data-step="add">drop a picture here</li>
+        </ol>
         <span class="ring-hint" id="ring-status" role="status" aria-live="polite" hidden>zoom in to reposition</span>
       </div>
       <div class="hstack mt-4 controls">
@@ -68,6 +72,7 @@ export class ImagePicker extends HTMLElement {
     this.slider = this.querySelector(".quality")!;
     this.zoomSlider = this.querySelector(".zoom")!;
     this.readout = this.querySelector(".readout")!;
+    this.markStep();
 
     // --- framing: pan by drag, zoom by wheel / pinch / slider, reset by double-click
     this.drop.addEventListener("pointerdown", this.onPointerDown);
@@ -109,7 +114,28 @@ export class ImagePicker extends HTMLElement {
     // warrants a re-clamp + re-encode — anything else re-encoding here made the preview
     // churn every time some unrelated state was poked.
     if (!this.readout || oldValue === newValue) return;
+    if (_name === "connected") {
+      this.markStep();
+      return;
+    }
     if (this.entry) this.setView(this.entry.view);
+  }
+
+  /**
+   * The empty ring is the onboarding: three steps, the live one marked, the done ones
+   * struck. State-driven, so it never nags a returning owner — it is gone the moment a
+   * picture lands, and it comes back only when the queue is empty again.
+   */
+  private markStep(): void {
+    const connected = this.getAttribute("connected") === "true";
+    const live = connected ? "add" : "press";
+    this.querySelectorAll<HTMLElement>(".steps li").forEach((li) => {
+      const step = li.dataset["step"]!;
+      const done = connected && step !== "add";
+      li.classList.toggle("done", done);
+      li.classList.toggle("live", step === live);
+      li.setAttribute("aria-current", step === live ? "step" : "false");
+    });
   }
 
   // ------------------------------------------------------------------ entry selection

@@ -87,6 +87,7 @@ export class UploadProgress extends HTMLElement {
     badge.on("disconnected", () => this.refresh());
     store.on("change", () => this.refresh());
     store.on("update", () => this.refresh());
+    this.refresh(); // first paint: nothing connected, nothing queued, animation group hidden
   }
 
   refresh(): void {
@@ -109,7 +110,9 @@ export class UploadProgress extends HTMLElement {
     const free = this.badge?.info?.freespace;
     const need = ready.reduce((k, e) => k + neededKb(e.prepared!.bytes), 0);
     this.consequence.textContent = !connected
-      ? "connect a badge to send"
+      ? n === 0
+        ? "connect a badge and add a picture"
+        : "connect a badge to send"
       : n === 0
         ? allSent
           ? "everything in the queue is already on the badge; change a picture to send it again"
@@ -118,13 +121,15 @@ export class UploadProgress extends HTMLElement {
             typeof free === "number" && need > free ? (this.override ? " · free-space check is OFF" : ` · does not fit: ${need} KB needed, ${free} KB free`) : ""
           }`;
     // The animation verb's eligibility is stated here too, not only in its tooltip.
-    if (connected && n > 0 && (n < ANIMATED_MIN || n > ANIMATED_MAX)) {
-      this.consequence.textContent += n < ANIMATED_MIN ? ` · as one animation needs ${ANIMATED_MIN}–${ANIMATED_MAX} pictures` : ` · as one animation takes at most ${ANIMATED_MAX} pictures`;
-    }
+    if (connected && n > ANIMATED_MAX) this.consequence.textContent += ` · as one animation takes at most ${ANIMATED_MAX} pictures`;
     this.consequence.classList.toggle("bad", typeof free === "number" && need > free);
     this.sendEach.title = "each picture becomes its own image on the badge";
 
     const animOk = n >= ANIMATED_MIN && n <= ANIMATED_MAX;
+    // Progressive disclosure: the animation verb and its frame-time slider only exist once
+    // there are enough pictures for them to mean anything. One dead button on first run
+    // is one too many; two plus a slider was the critique's "dead controls" finding.
+    this.querySelector<HTMLElement>(".anim-group")!.hidden = n < ANIMATED_MIN;
     this.sendAnim.disabled = !online || !animOk;
     this.sendAnim.title = !connected
       ? "connect a badge first"

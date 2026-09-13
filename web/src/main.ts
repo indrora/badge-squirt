@@ -58,7 +58,10 @@ badge.on("info", (e) => {
   const { width, height } = badge.size;
   list.setSize(width, height);
 });
-connect.addEventListener("connection", () => upload.refresh());
+connect.addEventListener("connection", (e) => {
+  upload.refresh();
+  picker.setAttribute("connected", String((e as CustomEvent<boolean>).detail)); // drives the empty ring's steps
+});
 // The free-space override is a gauge control; the bar only reads it.
 gauge.addEventListener("override-change", (e) => upload.setOverride((e as CustomEvent<boolean>).detail));
 
