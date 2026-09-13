@@ -24,16 +24,14 @@ export class BadgeConnect extends HTMLElement {
   connectedCallback(): void {
     this.innerHTML = `
       <h2 class="rail-title">Badge</h2>
-      <p class="ritual">Press the button on the badge, then connect within a few seconds. Chrome will show a chooser; pick the one starting <code>DZB</code>.</p>
+      <p class="ritual">Press its button, then Connect within a few seconds. Chrome shows a chooser; pick the one starting <code>DZB</code>.</p>
       <div class="vstack gap-2">
-        <button type="button">Connect badge</button>
+        <button type="button">Connect</button>
         <span class="status text-light" aria-live="polite">not connected</span>
       </div>
       <dl class="info mt-4" hidden>
-        <dt>Name</dt><dd data-f="name"></dd>
         <dt>Panel</dt><dd data-f="size"></dd>
-        <dt>Pacing</dt><dd data-f="gap"></dd>
-        <dt>ID</dt><dd data-f="add"></dd>
+        <dt>Transfer</dt><dd data-f="gap"></dd>
       </dl>`;
     this.button = this.querySelector("button")!;
     this.status = this.querySelector(".status")!;
@@ -86,7 +84,7 @@ export class BadgeConnect extends HTMLElement {
 
   /** Reflect connection state in the rail; public so demo mode can drive it like connect() does. */
   setState(connected: boolean): void {
-    this.button.textContent = connected ? "Disconnect" : "Connect badge";
+    this.button.textContent = connected ? "Disconnect" : "Connect";
     if (connected) this.button.dataset["variant"] = "secondary";
     else delete this.button.dataset["variant"];
     const demo = document.documentElement.dataset["demo"] === "1";
@@ -101,11 +99,12 @@ export class BadgeConnect extends HTMLElement {
   }
 
   private showInfo(info: DeviceInfo): void {
+    // Name is already in the status line and the address is in the debug log; the rail
+    // keeps only what changes what you do: the panel you are framing for, and how fast
+    // sending will be. The badge's time_mode is an engineer's flag; the owner hears speed.
     const set = (f: string, v: string) => (this.querySelector<HTMLElement>(`[data-f="${f}"]`)!.textContent = v);
-    set("name", this.badge?.name ?? "");
-    set("size", `${info.size.replace(",", "×")} px, round`);
-    set("gap", `${info.time_mode === 1 ? 10 : 80} ms per packet`);
-    set("add", info.ADD);
+    set("size", `${info.size.replace(",", " × ")} px, round`);
+    set("gap", info.time_mode === 1 ? "fast, ~1 s per picture" : "standard, several s per picture");
     this.infoEl.hidden = false;
   }
 }

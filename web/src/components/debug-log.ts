@@ -18,7 +18,7 @@ export class DebugLog extends HTMLElement {
     this.innerHTML = `
       <div class="hstack">
         <button type="button" class="clear outline" data-variant="secondary">clear</button>
-        <label><input type="checkbox" class="acks" checked> hide per-packet acks</label>
+        <label><input type="checkbox" class="acks" checked> hide per-packet replies</label>
       </div>
       <pre class="log mt-4" tabindex="0" role="log" aria-label="debug log: raw frames and packets"></pre>`;
     this.pre = this.querySelector("pre")!;

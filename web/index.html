@@ -75,7 +75,9 @@
     ul.entries .thumb { grid-column: 1; grid-row: 1 / span 2; width: 44px; height: 44px; border-radius: var(--radius-full); object-fit: cover; background: #000; }
     ul.entries .name { grid-column: 2; grid-row: 1; font-size: var(--text-7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     ul.entries .name .badge { padding-inline: var(--space-2); }
-    ul.entries .meta { grid-column: 2; grid-row: 2; font-size: var(--text-8); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    ul.entries .meta { grid-column: 2; grid-row: 2; font-size: var(--text-8); font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+                       display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); align-items: center; }
+    ul.entries .meta .badge { font-family: var(--font-sans); }
     /* remove is quiet at rest (muted, currentColor); danger only when it is about to happen */
     /* 14 px icon, 40 px hit area: the ghost variant's padding alone shrank this to 24 px tall */
     ul.entries .remove { grid-column: 3; grid-row: 1 / span 2; min-width: 40px; min-height: 40px; padding: 0; color: var(--muted-foreground); }
@@ -143,7 +145,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="workbench">
     <header class="head">
       <h1>badge squirt</h1>
-      <p>push pictures to a DZBJ- badge over Web Bluetooth</p>
+      <p>pictures onto your DZBJ- badge, straight from the browser</p>
       <p class="unsupported" role="alert" data-variant="danger" hidden>This browser has no Web Bluetooth. Use Chrome or Edge on https:// or localhost.</p>
     </header>
 
@@ -162,7 +164,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
 
     <details class="drawer">
-      <summary><span>debug log <span class="text-lighter">raw frames and packets</span></span></summary>
+      <summary><span>debug log <span class="text-lighter">every frame the badge sent, and the first packets we sent</span></span></summary>
       <debug-log></debug-log>
     </details>
 

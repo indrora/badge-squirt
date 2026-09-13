@@ -30,7 +30,7 @@ export class ImageList extends HTMLElement {
         <button type="button" class="add" data-variant="secondary">Add pictures…</button>
         <input type="file" accept="image/*" multiple hidden>
       </div>
-      <p class="text-light hint">Drop or paste images anywhere. GIFs keep their frames.</p>
+      <p class="text-light hint">Drop or paste pictures anywhere. A GIF stays animated.</p>
       <ul class="entries unstyled" role="listbox" aria-label="pictures to send"></ul>
       <p class="undo-line text-light" role="status" aria-live="polite" hidden>
         <span class="undo-text"></span> <button type="button" class="undo ghost">Undo</button>
@@ -127,16 +127,19 @@ export class ImageList extends HTMLElement {
     const name = li.querySelector<HTMLElement>(".name")!;
     name.textContent = entry.name;
     name.title = entry.name;
-    if (isAnimated(entry)) name.append(" ", badge(`${entry.frames.length} frames · ${nativeIntervalMs(entry)} ms`, "secondary"));
-    if (entry.sent) name.append(" ", badge("sent", "secondary"));
     const img = li.querySelector<HTMLImageElement>(".thumb")!;
     const meta = li.querySelector<HTMLElement>(".meta")!;
+    // Tags ride the meta line, not the name: the name is one clipped line and would
+    // swallow them; the meta line wraps.
+    meta.replaceChildren();
     if (entry.prepared) {
       img.src = entry.prepared.previewUrl;
-      meta.textContent = `${formatBytes(entry.prepared.bytes)} · quality ${entry.quality.toFixed(2)}`;
+      meta.append(`${formatBytes(entry.prepared.bytes)} · quality ${entry.quality.toFixed(2)}`);
     } else {
-      meta.textContent = "encoding…";
+      meta.append("encoding…");
     }
+    if (isAnimated(entry)) meta.append(" ", badge(`${entry.frames.length} frames, ${nativeIntervalMs(entry)} ms each`, "secondary"));
+    if (entry.sent) meta.append(" ", badge("sent", "secondary"));
   }
 }
 

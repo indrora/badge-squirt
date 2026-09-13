@@ -64,7 +64,7 @@ export class ImagePicker extends HTMLElement {
       </div>
       <div class="hstack mt-2 readout-row">
         <span class="readout text-light" aria-live="polite"></span>
-        <span class="encoded-tag badge" data-variant="secondary" hidden>showing encoded JPEG</span>
+        <span class="encoded-tag badge" data-variant="secondary" hidden>exactly what the badge will get</span>
         <span class="sent-tag badge" data-variant="secondary" hidden>on the badge (as far as we know)</span>
       </div>`;
     this.drop = this.querySelector(".drop")!;

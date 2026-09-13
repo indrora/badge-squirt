@@ -101,7 +101,7 @@ export class UploadProgress extends HTMLElement {
     const stills = n - gifs;
 
     this.sendEach.disabled = !online || n === 0;
-    const what = [stills && `${stills} still${stills > 1 ? "s" : ""}`, gifs && `${gifs} animation${gifs > 1 ? "s" : ""}`].filter(Boolean).join(" + ");
+    const what = [stills && `${stills} picture${stills > 1 ? "s" : ""}`, gifs && `${gifs} animation${gifs > 1 ? "s" : ""}`].filter(Boolean).join(" + ");
     this.sendEach.textContent = n === 0 ? "Send" : this.override ? `Send ${what} anyway` : `Send ${what}`;
     this.sendEach.classList.toggle("anyway", this.override && n > 0);
     // The consequence is stated before the click, in the badge's own terms: it appends
@@ -117,13 +117,13 @@ export class UploadProgress extends HTMLElement {
         ? allSent
           ? "everything in the queue is already on the badge; change a picture to send it again"
           : "add a picture to send"
-        : `adds ${need} KB to what is already on the badge; the badge cannot undo this from here${
+        : `adds ${need} KB alongside what is already on the badge — it keeps every picture you send; deleting is done on the badge itself${
             typeof free === "number" && need > free ? (this.override ? " · free-space check is OFF" : ` · does not fit: ${need} KB needed, ${free} KB free`) : ""
           }`;
     // The animation verb's eligibility is stated here too, not only in its tooltip.
     if (connected && n > ANIMATED_MAX) this.consequence.textContent += ` · as one animation takes at most ${ANIMATED_MAX} pictures`;
     this.consequence.classList.toggle("bad", typeof free === "number" && need > free);
-    this.sendEach.title = "each picture becomes its own image on the badge";
+    this.sendEach.title = "each picture is stored on the badge separately; a GIF plays at its own speed";
 
     const animOk = n >= ANIMATED_MIN && n <= ANIMATED_MAX;
     // Progressive disclosure: the animation verb and its frame-time slider only exist once
@@ -137,7 +137,7 @@ export class UploadProgress extends HTMLElement {
         ? `needs at least ${ANIMATED_MIN} pictures`
         : n > ANIMATED_MAX
           ? `at most ${ANIMATED_MAX} pictures can be flattened into one animation`
-          : "all pictures cycle as one animation at the frame time";
+          : "all pictures cycle as one animation, each shown for the frame time";
     this.sendAnim.textContent = animOk ? `Send ${n} as one animation` : "Send as animation";
   }
 
