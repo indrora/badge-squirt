@@ -56,6 +56,14 @@
     .gauge-head .caption { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-8); }
     space-gauge.over .caption { color: var(--danger); font-weight: var(--font-semibold); }
     space-gauge meter { --bar-height: 0.75rem; }
+    /* the override is the one dangerous control on the page: it sits with the number it
+       overrides and is drawn as danger, never as a plain checkbox in the send bar */
+    space-gauge .override { display: grid; grid-template-columns: auto 1fr; gap: 0 var(--space-2); align-items: start;
+                            font-size: var(--text-7); color: var(--danger); font-weight: var(--font-normal); margin-top: var(--space-1); }
+    space-gauge .override input { margin-top: 0.2em; accent-color: var(--danger); }
+    space-gauge .override .text-light { grid-column: 2; font-size: var(--text-8); }
+    .undo-line { margin: var(--space-2) 0 0; font-size: var(--text-7); display: flex; align-items: center; gap: var(--space-2); }
+    .undo-line .undo { padding: var(--space-1) var(--space-2); }
 
     ul.entries { display: grid; gap: var(--space-1); max-height: 420px; overflow: auto; margin: 0; }
     ul.entries li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 0 var(--space-3); align-items: center;
@@ -89,11 +97,13 @@
     .actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
     .anim-group { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
     .frame-time-label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-7); }
-    .override { font-size: var(--text-7); }
-    @media (min-width: 900px) { .override { margin-inline-start: auto; } }
+    .consequence { margin: 0; font-size: var(--text-7); }
+    .consequence.bad { color: var(--danger); }
+    button.send-each.anyway { background: var(--danger); color: var(--danger-foreground); }
     .progress-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: var(--space-4); }
     .progress-row .text { margin: 0; font-size: var(--text-7); font-variant-numeric: tabular-nums; text-align: end; }
     @media (max-width: 720px) { .progress-row { grid-template-columns: 1fr; } .progress-row .text { text-align: start; } }
+    .sent-tag { margin-inline-start: var(--space-2); }
 
     /* drawer */
     /* Oat styles <details>/<summary> as an accordion (chevron, frame); we only size the text */

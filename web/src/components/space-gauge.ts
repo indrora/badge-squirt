@@ -32,9 +32,21 @@ export class SpaceGauge extends HTMLElement {
         <span>Badge storage</span>
         <span class="caption text-light" aria-live="polite">connect to see space</span>
       </div>
-      <meter min="0" max="1" value="0" aria-label="badge storage used, including queued pictures"></meter>`;
+      <meter min="0" max="1" value="0" aria-label="badge storage used, including queued pictures"></meter>
+      <label class="override" data-variant="danger">
+        <input type="checkbox"> send even if it will not fit
+        <span class="text-light">the badge may refuse or truncate; use when the report above is wrong</span>
+      </label>`;
     this.meter = this.querySelector("meter")!;
     this.caption = this.querySelector(".caption")!;
+    // The override lives with the number it overrides. Whoever sends listens for this.
+    this.querySelector<HTMLInputElement>(".override input")!.addEventListener("change", (e) => {
+      this.dispatchEvent(new CustomEvent("override-change", { detail: (e.target as HTMLInputElement).checked, bubbles: true }));
+    });
+  }
+
+  get override(): boolean {
+    return this.querySelector<HTMLInputElement>(".override input")?.checked ?? false;
   }
 
   attach(badge: Badge, store: ImageStore): void {

@@ -59,6 +59,8 @@ badge.on("info", (e) => {
   list.setSize(width, height);
 });
 connect.addEventListener("connection", () => upload.refresh());
+// The free-space override is a gauge control; the bar only reads it.
+gauge.addEventListener("override-change", (e) => upload.setOverride((e as CustomEvent<boolean>).detail));
 
 // After a send the badge has that much less free space; it never re-reports. The store has
 // already marked the entries sent, so the gauge moves their KB from queued to used.

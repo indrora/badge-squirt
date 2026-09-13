@@ -61,9 +61,17 @@ export class BadgeConnect extends HTMLElement {
       this.setState(true);
     } catch (e) {
       const msg = (e as Error).message;
-      this.status.textContent = /cancel|chooser/i.test(msg)
-        ? "no badge chosen — press its button and try again"
-        : `could not connect: ${msg}`;
+      const name = (e as Error).name;
+      this.status.textContent =
+        name === "NotFoundError" || /cancel|chooser/i.test(msg)
+          ? "no badge chosen — press its button, then Connect within a few seconds"
+          : /NetworkError|GATT|disconnected/i.test(msg + name)
+            ? "the badge dropped the connection — press its button and try again"
+            : /no characteristic|notifications/i.test(msg)
+              ? "connected, but this badge speaks a protocol we don't know — see the debug log"
+              : /not available|Bluetooth/i.test(msg)
+                ? "this browser has no Web Bluetooth — use Chrome or Edge over https or localhost"
+                : `could not connect: ${msg}`;
       this.setState(false);
     } finally {
       this.button.disabled = false;

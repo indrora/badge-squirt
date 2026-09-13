@@ -31,7 +31,10 @@ export class ImageList extends HTMLElement {
         <input type="file" accept="image/*" multiple hidden>
       </div>
       <p class="text-light hint">Drop or paste images anywhere. GIFs keep their frames.</p>
-      <ul class="entries unstyled"></ul>`;
+      <ul class="entries unstyled" role="listbox" aria-label="pictures to send"></ul>
+      <p class="undo-line text-light" role="status" hidden>
+        <span class="undo-text"></span> <button type="button" class="undo ghost">Undo</button>
+      </p>`;
     this.list = this.querySelector("ul")!;
     this.input = this.querySelector("input")!;
     this.querySelector(".add")!.addEventListener("click", () => this.input.click());
@@ -45,6 +48,10 @@ export class ImageList extends HTMLElement {
       void this.addFiles(e.dataTransfer?.files ?? null);
     });
     document.addEventListener("paste", (e) => void this.addFiles(e.clipboardData?.files ?? null));
+    this.querySelector(".undo")!.addEventListener("click", () => {
+      this.store?.undoRemove();
+      this.querySelector<HTMLElement>(".undo-line")!.hidden = true;
+    });
   }
 
   attach(store: ImageStore): void {
@@ -52,6 +59,13 @@ export class ImageList extends HTMLElement {
     store.on("change", () => this.render());
     store.on("select", () => this.render());
     store.on("update", (e) => this.renderRow(e.detail));
+    // Removal is one click; say what went and offer the way back until the store purges it.
+    store.on("removed", (e) => {
+      const line = this.querySelector<HTMLElement>(".undo-line")!;
+      this.querySelector<HTMLElement>(".undo-text")!.textContent = `removed ${e.detail.name}`;
+      line.hidden = false;
+    });
+    store.on("purged", () => (this.querySelector<HTMLElement>(".undo-line")!.hidden = true));
   }
 
   /** Output size for the first encode; the editor re-encodes if the badge reports another. */
@@ -84,7 +98,7 @@ export class ImageList extends HTMLElement {
       <img class="thumb" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
       <span class="name"></span>
       <span class="meta text-light"></span>
-      <button type="button" class="remove ghost" aria-label="remove">${REMOVE_ICON}</button>`;
+      <button type="button" class="remove ghost" aria-label="remove ${entry.name}">${REMOVE_ICON}</button>`;
     li.addEventListener("click", (e) => {
       if ((e.target as HTMLElement).closest(".remove")) this.store!.remove(entry);
       else this.store!.select(entry);

@@ -58,6 +58,7 @@ export class ImagePicker extends HTMLElement {
       <div class="hstack mt-2 readout-row">
         <span class="readout text-light" aria-live="polite"></span>
         <span class="encoded-tag badge" data-variant="secondary" hidden>showing encoded JPEG</span>
+        <span class="sent-tag badge" data-variant="secondary" hidden>on the badge (as far as we know)</span>
       </div>`;
     this.drop = this.querySelector(".drop")!;
     this.canvas = this.querySelector("canvas")!;
@@ -87,6 +88,9 @@ export class ImagePicker extends HTMLElement {
   attach(store: ImageStore): void {
     this.store = store;
     store.on("select", (e) => this.show(e.detail));
+    store.on("update", (e) => {
+      if (e.detail === this.entry) this.querySelector<HTMLElement>(".sent-tag")!.hidden = !e.detail.sent;
+    });
     // The store encodes a freshly added entry itself; when that lands for the entry we
     // are showing, paint it. Scheduling our own encode here as well used to double the
     // work for every GIF and revoke the preview URL the list thumbnail was using.
@@ -117,6 +121,7 @@ export class ImagePicker extends HTMLElement {
     this.querySelector<HTMLButtonElement>(".reset")!.disabled = !has;
     this.drop.classList.toggle("loaded", has);
     this.querySelector<HTMLElement>(".encoded-tag")!.hidden = true;
+    this.querySelector<HTMLElement>(".sent-tag")!.hidden = !entry?.sent;
     if (!entry) {
       this.readout.textContent = "";
       return;

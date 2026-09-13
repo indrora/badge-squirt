@@ -10,6 +10,8 @@
  *   change   — entries added/removed/reordered (detail: entries)
  *   select   — a different entry is now selected (detail: entry | null)
  *   update   — one entry's encode finished (detail: entry)
+ *   removed  — an entry was removed and can be undone for a while (detail: entry)
+ *   purged   — the undo window closed; the entry's bitmaps are gone (detail: entry)
  */
 
 import { DEFAULT_QUALITY, IDENTITY_VIEW, decodeFrames, prepareImage, type PreparedImage, type View } from "./image.js";
@@ -49,6 +51,8 @@ export class ImageStore extends EventTarget {
   on(type: "change", fn: (e: CustomEvent<ImageEntry[]>) => void): void;
   on(type: "select", fn: (e: CustomEvent<ImageEntry | null>) => void): void;
   on(type: "update", fn: (e: CustomEvent<ImageEntry>) => void): void;
+  on(type: "removed", fn: (e: CustomEvent<ImageEntry>) => void): void;
+  on(type: "purged", fn: (e: CustomEvent<ImageEntry>) => void): void;
   on(type: string, fn: (e: never) => void): void {
     this.addEventListener(type, fn as EventListener);
   }
@@ -77,14 +81,47 @@ export class ImageStore extends EventTarget {
     return entry;
   }
 
-  remove(entry: ImageEntry): void {
+  /** The last removed entry, restorable until the next remove or until it is purged. */
+  removed: { entry: ImageEntry; index: number } | null = null;
+  private purgeTimer = 0;
+
+  /**
+   * Remove is one click or one keypress, so it is undoable: the entry is parked for a
+   * while (bitmaps kept alive) and can be put back at its old index. A second remove
+   * purges the first; so does the timeout. Nothing here touches the badge.
+   */
+  remove(entry: ImageEntry, undoWindowMs = 8000): void {
     const i = this.entries.indexOf(entry);
     if (i < 0) return;
+    this.purgeRemoved();
     this.entries.splice(i, 1);
+    this.removed = { entry, index: i };
+    this.emit("change", this.entries);
+    this.emit("removed", entry);
+    if (this.selected === entry) this.select(this.entries[Math.min(i, this.entries.length - 1)] ?? null);
+    this.purgeTimer = window.setTimeout(() => this.purgeRemoved(), undoWindowMs);
+  }
+
+  /** Put the last removed entry back where it was. Returns it, or null if nothing to undo. */
+  undoRemove(): ImageEntry | null {
+    if (!this.removed) return null;
+    clearTimeout(this.purgeTimer);
+    const { entry, index } = this.removed;
+    this.removed = null;
+    this.entries.splice(Math.min(index, this.entries.length), 0, entry);
+    this.emit("change", this.entries);
+    this.select(entry);
+    return entry;
+  }
+
+  private purgeRemoved(): void {
+    clearTimeout(this.purgeTimer);
+    if (!this.removed) return;
+    const { entry } = this.removed;
+    this.removed = null;
     if (entry.prepared) URL.revokeObjectURL(entry.prepared.previewUrl);
     for (const f of entry.frames) f.close();
-    this.emit("change", this.entries);
-    if (this.selected === entry) this.select(this.entries[Math.min(i, this.entries.length - 1)] ?? null);
+    this.emit("purged", entry);
   }
 
   select(entry: ImageEntry | null): void {

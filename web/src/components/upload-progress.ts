@@ -35,8 +35,9 @@ export class UploadProgress extends HTMLElement {
   private abort!: HTMLButtonElement;
   private bar!: HTMLProgressElement;
   private text!: HTMLElement;
-  private override!: HTMLInputElement;
+  private override = false;
   private frameTime!: HTMLInputElement;
+  private consequence!: HTMLElement;
 
   connectedCallback(): void {
     this.innerHTML = `
@@ -48,8 +49,8 @@ export class UploadProgress extends HTMLElement {
             <input type="range" class="frame-time" min="0.5" max="10" step="0.5" value="${DEFAULT_FRAME_S}" aria-label="frame time in seconds"></label>
         </div>
         <button type="button" class="abort ghost" data-variant="danger" hidden>Abort</button>
-        <label class="override"><input type="checkbox"> ignore free-space check</label>
       </div>
+      <p class="consequence text-light" aria-live="polite"></p>
       <div class="progress-row">
         <progress max="1" value="0"></progress>
         <span class="text text-light" aria-live="polite">nothing sent yet</span>
@@ -59,7 +60,7 @@ export class UploadProgress extends HTMLElement {
     this.abort = this.querySelector(".abort")!;
     this.bar = this.querySelector("progress")!;
     this.text = this.querySelector(".text")!;
-    this.override = this.querySelector("input[type=checkbox]")!;
+    this.consequence = this.querySelector(".consequence")!;
     this.frameTime = this.querySelector(".frame-time")!;
     this.sendEach.addEventListener("click", () => void this.runIndividually());
     this.sendAnim.addEventListener("click", () => void this.runAnimated());
@@ -67,6 +68,12 @@ export class UploadProgress extends HTMLElement {
     this.frameTime.addEventListener("input", () => {
       this.querySelector("output")!.textContent = `${Number(this.frameTime.value).toFixed(1)} s`;
     });
+  }
+
+  /** Free-space override, owned by <space-gauge>; main.ts forwards its change event here. */
+  setOverride(on: boolean): void {
+    this.override = on;
+    this.refresh();
   }
 
   attach(badge: Badge, store: ImageStore): void {
@@ -93,17 +100,25 @@ export class UploadProgress extends HTMLElement {
     const stills = n - gifs;
 
     this.sendEach.disabled = !online || n === 0;
-    this.sendEach.textContent =
-      n === 0
-        ? "Send"
-        : `Send ${[stills && `${stills} still${stills > 1 ? "s" : ""}`, gifs && `${gifs} animation${gifs > 1 ? "s" : ""}`].filter(Boolean).join(" + ")}`;
-    this.sendEach.title = !connected
-      ? "connect a badge first"
-      : allSent
-        ? "everything in the queue is already on the badge; change a picture to send it again"
-        : n === 0
-          ? "add a picture first"
-          : "each picture becomes its own image on the badge";
+    const what = [stills && `${stills} still${stills > 1 ? "s" : ""}`, gifs && `${gifs} animation${gifs > 1 ? "s" : ""}`].filter(Boolean).join(" + ");
+    this.sendEach.textContent = n === 0 ? "Send" : this.override ? `Send ${what} anyway` : `Send ${what}`;
+    this.sendEach.classList.toggle("anyway", this.override && n > 0);
+    // The consequence is stated before the click, in the badge's own terms: it appends
+    // (free space drops, nothing is replaced), it never acknowledges, and nothing on this
+    // page can take a picture off it again.
+    const free = this.badge?.info?.freespace;
+    const need = ready.reduce((k, e) => k + neededKb(e.prepared!.bytes), 0);
+    this.consequence.textContent = !connected
+      ? "connect a badge to send"
+      : n === 0
+        ? allSent
+          ? "everything in the queue is already on the badge; change a picture to send it again"
+          : "add a picture to send"
+        : `adds ${need} KB to what is already on the badge; the badge cannot undo this from here${
+            typeof free === "number" && need > free ? (this.override ? " · free-space check is OFF" : ` · does not fit: ${need} KB needed, ${free} KB free`) : ""
+          }`;
+    this.consequence.classList.toggle("bad", typeof free === "number" && need > free);
+    this.sendEach.title = "each picture becomes its own image on the badge";
 
     const animOk = n >= ANIMATED_MIN && n <= ANIMATED_MAX;
     this.sendAnim.disabled = !online || !animOk;
@@ -121,11 +136,21 @@ export class UploadProgress extends HTMLElement {
   private fits(bytes: number): boolean {
     const free = this.badge?.info?.freespace;
     const need = neededKb(bytes);
-    if (typeof free === "number" && need > free && !this.override.checked) {
-      this.text.textContent = `needs ${need} KB but the badge has ${free} KB free — remove a picture, lower quality, or tick the override`;
+    if (typeof free === "number" && need > free && !this.override) {
+      this.text.textContent = `needs ${need} KB but the badge has ${free} KB free — remove a picture, lower quality, or tick "send even if it will not fit" under the gauge`;
       return false;
     }
     return true;
+  }
+
+  /** Turn the BLE layer's exceptions into the user's language: what happened, what to do. */
+  private explain(e: unknown): string {
+    const msg = (e as Error).message ?? String(e);
+    if (document.documentElement.dataset["demo"]) return "demo mode: nothing was sent, there is no badge";
+    if (/aborted/i.test(msg)) return "stopped — the badge may show a partial update; send again to replace it";
+    if (/not connected|disconnected|GATT|Network/i.test(msg)) return "the badge dropped the connection mid-send — press its button and connect again, then send";
+    if (/GetPacketFail|failed before packet/i.test(msg)) return "the badge rejected the transfer — try a smaller picture or lower quality";
+    return `could not send: ${msg}`;
   }
 
   private async run(label: string, entries: ImageEntry[], work: () => Promise<void>): Promise<void> {
@@ -141,7 +166,7 @@ export class UploadProgress extends HTMLElement {
       this.store!.markSent(entries);
       this.dispatchEvent(new CustomEvent("uploaded", { detail: entries, bubbles: true }));
     } catch (e) {
-      this.text.textContent = `failed: ${(e as Error).message}`;
+      this.text.textContent = this.explain(e);
     } finally {
       this.busy = false;
       this.stage = "";
