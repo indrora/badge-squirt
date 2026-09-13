@@ -23,6 +23,7 @@ import type { ImagePicker } from "./components/image-picker.js";
 import type { UploadProgress } from "./components/upload-progress.js";
 import type { DebugLog } from "./components/debug-log.js";
 import { neededKb } from "./image.js";
+import { fromHex, parseNotification } from "./protocol/packet.js";
 import type { ImageEntry } from "./model.js";
 
 const badge = new Badge();
@@ -100,6 +101,12 @@ if (location.search.includes("demo")) {
     (badge as unknown as { device: unknown }).device = { name: "DZBJ-TV07(BLE)" };
     badge.dispatchEvent(new CustomEvent("info", { detail: badge.info }));
     (connect as unknown as { setState(c: boolean): void }).setState(true); // what a real connect() does
+    // Give the drawer something true to show: the info frame a DZBJ-TV07 really sent (doc §4).
+    debug.add("demo mode: no hardware; the frame below is a real capture from 2026-09-12");
+    const raw = fromHex(
+      "a00d00008a7b2274797065223a31332c22616c6c7370616365223a31363338342c22667265657370616365223a353530302c226465766e616d65223a22222c2273697a65223a223336382c333638222c2273637265656e223a2230222c22414444223a2237392c33462c37352c32422c37462c4536222c2274696d655f6d6f6465223a312c226272616e64223a307dd0",
+    );
+    badge.dispatchEvent(new CustomEvent("frame", { detail: { raw, parsed: parseNotification(raw) } }));
     for (const [name, type] of [["_test.jpg", "image/jpeg"], ["_test2.jpg", "image/jpeg"], ["_test.gif", "image/gif"]] as const) {
       const r = await fetch(name);
       if (r.ok) await store.add(new File([await r.blob()], name.replace("_test", "photo"), { type }), 368, 368);
