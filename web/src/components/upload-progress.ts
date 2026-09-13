@@ -7,7 +7,7 @@
  *     A still goes as ALBUM (type 6); a GIF goes as its own animation, DYNAMIC_ATMOSPHERE
  *     (type 5) at the file's native frame time. A GIF is a "funny shaped image" right up
  *     until the packet layer.
- *   Send animation — 2–5 entries flattened into one frame-pack (every GIF contributes all
+ *   Send animation — 2+ entries flattened into one frame-pack (every GIF contributes all
  *     its frames, stills contribute one) and sent once as type 5 at the chosen frame time.
  *     Verified with `dzbj.py slideshow`.
  *
@@ -19,7 +19,7 @@
 
 import type { Badge } from "../ble/badge.js";
 import { formatBytes, neededKb } from "../image.js";
-import { ANIMATED_MAX, ANIMATED_MIN, isAnimated, nativeIntervalMs, type ImageEntry, type ImageStore } from "../model.js";
+import { ANIMATED_MIN, isAnimated, nativeIntervalMs, type ImageEntry, type ImageStore } from "../model.js";
 import { framePack } from "../protocol/packet.js";
 
 const PAUSE_BETWEEN_ITEMS_MS = 2000;
@@ -137,11 +137,10 @@ export class UploadProgress extends HTMLElement {
             typeof free === "number" && need > free ? (this.override ? " · free-space check is OFF" : ` · does not fit: ${need} KB needed, ${free} KB free`) : ""
           }`;
     // The animation verb's eligibility is stated here too, not only in its tooltip.
-    if (connected && n > ANIMATED_MAX) this.consequence.textContent += ` · as one animation takes at most ${ANIMATED_MAX} pictures`;
     this.consequence.classList.toggle("bad", typeof free === "number" && need > free);
     this.sendEach.title = "each picture is stored on the badge separately; a GIF plays at its own speed";
 
-    const animOk = n >= ANIMATED_MIN && n <= ANIMATED_MAX;
+    const animOk = n >= ANIMATED_MIN;
     // Progressive disclosure: the animation verb and its frame-time slider only exist once
     // there are enough pictures for them to mean anything. One dead button on first run
     // is one too many; two plus a slider was the critique's "dead controls" finding.
@@ -151,9 +150,7 @@ export class UploadProgress extends HTMLElement {
       ? "connect a badge first"
       : n < ANIMATED_MIN
         ? `needs at least ${ANIMATED_MIN} pictures`
-        : n > ANIMATED_MAX
-          ? `at most ${ANIMATED_MAX} pictures can be flattened into one animation`
-          : "all pictures cycle as one animation, each shown for the frame time";
+        : "all pictures cycle as one animation, each shown for the frame time";
     this.sendAnim.textContent = animOk ? `Send ${n} as one animation` : "Send as animation";
   }
 

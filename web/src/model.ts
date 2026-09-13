@@ -39,9 +39,12 @@ export function nativeIntervalMs(e: ImageEntry): number {
   return d[Math.floor(d.length / 2)] || 100;
 }
 
-/** Frame-pack limits for the animated upload: fewer than 2 is a still, more than 5 is a lot of flash. */
+/**
+ * Fewer than 2 frames is a still, not an animation. There is no upper bound: the vendor app's
+ * five-picture cap was a UI choice with no protocol behind it (confirmed on hardware,
+ * 2026-09-13); the only real limit is the badge's free space, which the gauge enforces.
+ */
 export const ANIMATED_MIN = 2;
-export const ANIMATED_MAX = 5;
 
 export class ImageStore extends EventTarget {
   entries: ImageEntry[] = [];

@@ -112,7 +112,7 @@ Free-space check: `ceil(len/1024) <= device.freespace` (freespace reported in KB
 
 **Verified 2026-09-12** on DZBJ-TV07: `dzbj.py slideshow` sent three q70 frames at 1000 ms (93 KB container, chunk 426) and the badge cycles them.
 
-Used for slideshow, marquee and video. Frames are JPEGs (video is decoded to frames on
+Used for slideshow, marquee and video. The app caps a slideshow at five pictures; that is a UI choice only — the firmware accepts larger frame packs (confirmed 2026-09-13), bounded by free space. Frames are JPEGs (video is decoded to frames on
 the phone first), named `output/<ms>ms/frame_000001.jpg` … Interval `ms = speed*1000`
 (default speed 0.1 → 100 ms).
 

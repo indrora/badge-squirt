@@ -44,8 +44,9 @@ No claim of superiority beyond that; it is a community tool that works.
 
 * Confirmed: connect/disconnect; a list of pictures; per-picture pan/zoom crop and JPEG
   quality with the encoded result shown; GIFs decode into multi-frame entries; upload each
-  entry individually (still → type 6, GIF → type 5 at native speed) or flatten 2–5
-  entries into one animation at a chosen frame time (0.5–10 s); free-space check with
+  entry individually (still → type 6, GIF → type 5 at native speed) or flatten any two or
+  more entries into one animation at a chosen frame time (0.5–10 s); the vendor app's
+  five-picture cap had no protocol behind it (confirmed 2026-09-13); free-space check with
   override; raw hex debug log.
 * Chrome/Edge only (Web Bluetooth, ImageDecoder). Must be served over https or localhost.
 * No bundler: TypeScript compiled by tsc to browser ES modules; UI kit is Oat (@knadh/oat)
