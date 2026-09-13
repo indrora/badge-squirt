@@ -22,6 +22,8 @@ export class ImageList extends HTMLElement {
   private size = { width: 368, height: 368 };
   private list!: HTMLElement;
   private input!: HTMLInputElement;
+  /** Ids already marked sent, so the stamp animates only on the transition, not on every repaint. */
+  private stamped = new Set<number>();
 
   connectedCallback(): void {
     this.innerHTML = `
@@ -139,7 +141,17 @@ export class ImageList extends HTMLElement {
       meta.append("encoding…");
     }
     if (isAnimated(entry)) meta.append(" ", badge(`${entry.frames.length} frames, ${nativeIntervalMs(entry)} ms each`, "secondary"));
-    if (entry.sent) meta.append(" ", badge("sent", "secondary"));
+    if (entry.sent) {
+      meta.append(" ", badge("sent", "secondary"));
+      if (!this.stamped.has(entry.id)) {
+        this.stamped.add(entry.id);
+        // The row's acknowledgement: the thumbnail pings once as the picture leaves.
+        img.classList.add("just-sent");
+        img.addEventListener("animationend", () => img.classList.remove("just-sent"), { once: true });
+      }
+    } else {
+      this.stamped.delete(entry.id);
+    }
   }
 }
 

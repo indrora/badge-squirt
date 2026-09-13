@@ -69,6 +69,7 @@ gauge.addEventListener("override-change", (e) => upload.setOverride((e as Custom
 // After a send the badge has that much less free space; it never re-reports. The store has
 // already marked the entries sent, so the gauge moves their KB from queued to used.
 upload.addEventListener("uploaded", (e) => {
+  picker.ping(); // the ring acknowledges: the pictures left the laptop
   if (!badge.info) return;
   const sent = (e as CustomEvent<ImageEntry[]>).detail;
   badge.info.freespace -= sent.reduce((n, entry) => n + neededKb(entry.prepared!.bytes), 0);

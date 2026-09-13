@@ -30,6 +30,7 @@ export class UploadProgress extends HTMLElement {
   private store: ImageStore | null = null;
   private busy = false;
   private stage = "";
+  private sendStarted = 0;
   private sendEach!: HTMLButtonElement;
   private sendAnim!: HTMLButtonElement;
   private abort!: HTMLButtonElement;
@@ -82,7 +83,11 @@ export class UploadProgress extends HTMLElement {
     badge.on("progress", (e) => {
       const p = e.detail;
       this.bar.value = p.bytes / p.totalBytes;
-      this.text.textContent = `${this.stage}${p.sent}/${p.total} packets · ${formatBytes(p.bytes)} of ${formatBytes(p.totalBytes)}`;
+      // Waiting made informative: the real rate, so a slow badge is visibly slow rather than
+      // mysteriously stuck (time_mode 0 badges pace at 80 ms and crawl at ~6 kB/s).
+      const secs = (performance.now() - this.sendStarted) / 1000;
+      const rate = secs > 0.3 ? ` · ${(p.bytes / 1024 / secs).toFixed(0)} kB/s` : "";
+      this.text.textContent = `${this.stage}${p.sent}/${p.total} packets · ${formatBytes(p.bytes)} of ${formatBytes(p.totalBytes)}${rate}`;
     });
     badge.on("disconnected", () => this.refresh());
     store.on("change", () => this.refresh());
@@ -168,10 +173,13 @@ export class UploadProgress extends HTMLElement {
     this.abort.hidden = false;
     this.bar.value = 0;
     const t0 = performance.now();
+    this.sendStarted = t0;
     try {
       await work();
       const s = ((performance.now() - t0) / 1000).toFixed(1);
-      this.text.textContent = `${label} sent in ${s} s — the badge should be updating (it never confirms)`;
+      // The product's own verb, once, at the one moment that earns it. The hedge stays: the
+      // badge never confirms and the copy never pretends it did.
+      this.text.textContent = `squirted ${label} in ${s} s — the badge should be updating (it never confirms)`;
       this.store!.markSent(entries);
       this.dispatchEvent(new CustomEvent("uploaded", { detail: entries, bubbles: true }));
     } catch (e) {

@@ -24,7 +24,7 @@ export class BadgeConnect extends HTMLElement {
   connectedCallback(): void {
     this.innerHTML = `
       <h2 class="rail-title">Badge</h2>
-      <p class="ritual">Press its button, then Connect within a few seconds. Chrome shows a chooser; pick the one starting <code>DZB</code>.</p>
+      <p class="ritual">Press the Bluetooth button on the badge, then click Connect. Select the badge starting with <code>DZB</code> in the chooser.</p>
       <div class="vstack gap-2">
         <button type="button">Connect</button>
         <span class="status text-light" aria-live="polite">not connected</span>

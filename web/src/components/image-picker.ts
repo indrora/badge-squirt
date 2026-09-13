@@ -94,6 +94,19 @@ export class ImagePicker extends HTMLElement {
     });
   }
 
+  /**
+   * The send-complete acknowledgement: one radio ping off the ring. The badge never says
+   * "got it", so this is honest about what it marks — the picture left the laptop — and
+   * runs once per send, never on load or hover. Reduced motion swaps the expanding ring for
+   * a brief opacity flash so the acknowledgement still reads.
+   */
+  ping(): void {
+    this.drop.classList.remove("pinging");
+    void this.drop.offsetWidth; // restart the animation if a send lands mid-ping
+    this.drop.classList.add("pinging");
+    this.drop.addEventListener("animationend", () => this.drop.classList.remove("pinging"), { once: true });
+  }
+
   attach(store: ImageStore): void {
     this.store = store;
     store.on("select", (e) => this.show(e.detail));
